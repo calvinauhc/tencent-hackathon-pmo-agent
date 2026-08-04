@@ -83,6 +83,17 @@ check("12.6 the batch/Periodic Gate 2 Review dropdown entry is gone", "Periodic 
 check("12.6 the compose box posts to the real /submit route", 'action="/submit"' in landing, '/submit' in landing)
 check("12.6 the compose box has From/Subject/Body fields, not one raw textarea", 'name="from"' in landing and 'name="subject"' in landing and 'name="body"' in landing, None)
 
+# --- 12.7 Case 8/9 present as real update emails (From/Subject/body), matching cases 1-7's own
+# markup pattern, not a paragraph of "Agent 12 does X" system-speak with a "Simulate..." button —
+# an explicit ask: these should read as the project originator emailing PMO an update. ---
+panel8 = landing[landing.index('id="panel-case8"'):landing.index('id="panel-case9"')]
+panel9 = landing[landing.index('id="panel-case9"'):landing.index('id="panel-case10"')]
+check("12.7 Case 8 shows a From/Subject email header, not descriptive prose", '<b>From:</b>' in panel8 and '<b>Subject:</b>' in panel8, None)
+check("12.7 Case 8's email body is the real CHANGE_CASE_EMAILS content", "pulling the launch date in by a month" in panel8, None)
+check("12.7 Case 9 shows a From/Subject email header, not descriptive prose", '<b>From:</b>' in panel9 and '<b>Subject:</b>' in panel9, None)
+check("12.7 Case 9's email body is the real CHANGE_CASE_EMAILS content", "flagging a new dependency risk" in panel9, None)
+check("12.7 Case 8/9 use the same plain 'Run this case' button cases 1-7 use, not 'Simulate...'", "Simulate" not in panel8 and "Simulate" not in panel9, None)
+
 print()
 passed = sum(1 for _, s in results if s == "PASS")
 print(f"Phase 12: {passed}/{len(results)} checks passed")

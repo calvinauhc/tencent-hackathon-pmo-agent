@@ -328,6 +328,35 @@ CHANGE_DEMO_PAYLOADS = {
     },
 }
 
+# Predrafted "update" emails for Case 8/9, phrased the way Case 1's own submitter (Grace Lim, per
+# SCENARIO_EMAILS) would actually write a status update — same convention as SCENARIO_EMAILS itself
+# ("phrased the way a submitter would write it, built from that scenario's real trial-data fields,
+# not fabricated"). Every number below is CHANGE_DEMO_PAYLOADS' own real field, not invented for the
+# email — Case 1's original figures ($60,000 CAPEX, October 2026 launch) come straight from that
+# scenario's own SCENARIO_EMAILS entry. Log_update()/process_update() still run on the structured
+# CHANGE_DEMO_PAYLOADS dict directly (exactly how cases 1-7 run on structured trial-data Project
+# objects, not by re-parsing their own shown email text) — this is a presentation-layer fix, so an
+# update reads as a real person emailing PMO, not as "an agent ran something."
+CHANGE_CASE_EMAILS = {
+    "favorable": {
+        "from": "Grace Lim <grace.lim@company.com>",
+        "subject": "Update: Customer support AI triage — launch date + budget change",
+        "body": "Hi PMO team,\n\nQuick update on Customer support AI triage (PRJ-2026-0791).\n\n"
+                "Vendor quote came in under budget, so we're pulling the launch date in by a month.\n\n"
+                "Revised CAPEX: $55,000 (previously $60,000).\nRevised launch: September 2026 (previously October 2026).\n\n"
+                "Nothing else has changed on the risk side.\n\nThanks,\nGrace",
+    },
+    "unfavorable": {
+        "from": "Grace Lim <grace.lim@company.com>",
+        "subject": "Update: Customer support AI triage — scope change, flagging risk",
+        "body": "Hi PMO team,\n\nUpdate on Customer support AI triage (PRJ-2026-0791).\n\n"
+                "Integration scope grew after vendor discovery — flagging a new dependency risk we "
+                "didn't anticipate at intake.\n\nRevised CAPEX: $85,000 (previously $60,000).\n"
+                "Risk: elevated to yellow — new external dependency.\n\n"
+                "Wanted to flag this before proceeding given the cost and risk change.\n\nThanks,\nGrace",
+    },
+}
+
 def _ensure_seeded(conn, project_ref):
     """The composer's DB only has whatever the last /run/<scenario> call inserted (fresh=True wipes
     it each time) — if no scenario has been run yet this session, `projects` may be empty. Load the

@@ -35,9 +35,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.dirname(__file__))
 from demo_engine import (
     run_scenario_to_gate2, resume_scenario, SCENARIO_ORDER, SCENARIO_META, SCENARIO_EMAILS,
-    submit_project_update, resolve_gate3_decision, CHANGE_DEMO_PAYLOADS, complete_project,
-    run_batch_case, review_queued_project, override_queued_project, open_batch, close_batch,
-    render_gate2_queue, submit_freeform, FREEFORM_BODY_PLACEHOLDER,
+    submit_project_update, resolve_gate3_decision, CHANGE_DEMO_PAYLOADS, CHANGE_CASE_EMAILS,
+    complete_project, run_batch_case, review_queued_project, override_queued_project, open_batch,
+    close_batch, render_gate2_queue, submit_freeform, FREEFORM_BODY_PLACEHOLDER,
 )
 # Note: run_batch_case/review_queued_project/override_queued_project/open_batch/close_batch and
 # their /batch/, /queue/* HTTP routes below are kept fully wired even though the "Periodic Gate 2
@@ -143,16 +143,16 @@ def render_landing():
     # against Case 1's already-accepted project (PRJ-2026-0791) — nothing about the underlying
     # actions changed, only how they're exposed in the left panel.
     options.append('<option value="case8">Case 8 — Project update to increase launch date</option>')
-    panels.append("""
+    fav_email = CHANGE_CASE_EMAILS["favorable"]
+    panels.append(f"""
 <div class="action-panel" id="panel-case8">
 <div class="case" style="border-color:#dceafa">
   <div class="head" style="background:#e6f1fb"><span class="title">Case 8 — Project update to increase launch date</span>
   <span class="outcome">Expected: Agent 12 applies it immediately, no PMO gate</span></div>
-  <div class="mail" style="max-height:none">
-    <div class="line">Runs against Case 1's already-accepted project (PRJ-2026-0791). Simulates the
-    project team submitting a status update that pulls the launch date in and lowers CAPEX. Agent 11
-    logs it; Agent 12 deterministically checks timeline/cost/risk, finds it favorable on every axis,
-    and applies it directly.</div>
+  <div class="mail">
+    <div class="line"><b>From:</b> {html.escape(fav_email['from'])}</div>
+    <div class="line"><b>Subject:</b> {html.escape(fav_email['subject'])}</div>
+    <div class="body">{html.escape(fav_email['body'])}</div>
   </div>
   <form class="runbar" method="POST" action="/change/PRJ-2026-0791/favorable" target="middle-frame">
     <button type="submit">▶ Run this case</button>
@@ -161,16 +161,16 @@ def render_landing():
 </div>""")
 
     options.append('<option value="case9">Case 9 — Project update needing PMO authorization</option>')
-    panels.append("""
+    unfav_email = CHANGE_CASE_EMAILS["unfavorable"]
+    panels.append(f"""
 <div class="action-panel" id="panel-case9">
 <div class="case" style="border-color:#dceafa">
   <div class="head" style="background:#e6f1fb"><span class="title">Case 9 — Project update needing PMO authorization</span>
   <span class="outcome">Expected: Agent 12 escalates to Manual Gate 3</span></div>
-  <div class="mail" style="max-height:none">
-    <div class="line">Runs against Case 1's already-accepted project (PRJ-2026-0791). Simulates a
-    status update where integration scope grew — CAPEX rises and a new risk is flagged. Agent 12
-    finds it regresses on risk, so it doesn't auto-apply; a real Manual Gate 3 opens for you to
-    authorize or decline.</div>
+  <div class="mail">
+    <div class="line"><b>From:</b> {html.escape(unfav_email['from'])}</div>
+    <div class="line"><b>Subject:</b> {html.escape(unfav_email['subject'])}</div>
+    <div class="body">{html.escape(unfav_email['body'])}</div>
   </div>
   <form class="runbar" method="POST" action="/change/PRJ-2026-0791/unfavorable" target="middle-frame">
     <button type="submit">▶ Run this case</button>
