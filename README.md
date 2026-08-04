@@ -22,7 +22,7 @@ No API key is required to run or test this build — it runs in mock mode automa
 ./run_all_tests.sh
 ```
 
-Runs all 5 phase test files in order (`tests/scenarios/`, `tests/eval/`) and prints pass/fail counts. 54 checks total, covering agents, the state machine, guardrails, the full pipeline across all 7 named scenarios, and the dashboard/visualizer/comment panel. To run one phase at a time:
+Runs all 11 phase test files in order (`tests/scenarios/`, `tests/eval/`) and prints pass/fail counts. 159 checks total, covering agents, the state machine, guardrails, the full pipeline across all 10 named scenarios (7 original + 3 batch-queue cases), the post-acceptance change-management/OPL loop, the periodic Gate 2 review queue, and the dashboard/visualizer/comment panel. To run one phase at a time:
 
 ```
 python3 tests/scenarios/test_phase1.py
@@ -30,6 +30,12 @@ python3 tests/eval/test_phase2.py
 python3 tests/scenarios/test_phase3.py
 python3 tests/eval/test_phase4.py
 python3 tests/eval/test_phase5.py
+python3 tests/scenarios/test_phase6.py    # Agent 11 (Update Logger)
+python3 tests/scenarios/test_phase7.py    # Agent 12 (Change Evaluator) + Gate 3
+python3 tests/scenarios/test_phase8.py    # Agent 13 (OPL Composer) + Agent 2/5 feedback
+python3 tests/scenarios/test_phase9.py    # Periodic Gate 2 Review batching (§5.3)
+python3 tests/scenarios/test_phase10.py   # Gate 2 accept-comment + Hold
+python3 tests/scenarios/test_phase11.py   # "comparing Foo's repo" upversion — see below
 ```
 
 ## Seeing the actual system run — in a browser (recommended)
@@ -69,7 +75,14 @@ All 7 scenario keys (see `data/trial-projects.json`'s `scenario_index`, or §12 
 
 ## Mock mode
 
-`src/llm/client.py` runs in mock mode whenever `ANTHROPIC_API_KEY` isn't set in the environment — every agent call returns a hand-written, hand-verified mock response instead of hitting a real model. This is how all 54 tests pass without spending any credits. Setting a real `ANTHROPIC_API_KEY` switches to live Claude calls automatically; no code changes needed.
+`src/llm/client.py` runs in mock mode whenever `ANTHROPIC_API_KEY` isn't set in the environment — every agent call returns a hand-written, hand-verified mock response instead of hitting a real model. This is how all 159 tests pass without spending any credits. Setting a real `ANTHROPIC_API_KEY` switches to live Claude calls automatically; no code changes needed.
+
+Two optional, additive upgrades on top of mock mode — both off by default, both fall back cleanly if unset or if the real call fails, neither changes any existing test:
+
+- **`VOYAGE_API_KEY`** — Agent 2's duplicate check uses real Voyage AI embeddings instead of the default TF-IDF stand-in (`src/llm/embeddings.py`). Absent the key, or if a real call ever fails, it falls straight back to TF-IDF.
+- Agent 1's intake parser now has a real deterministic fallback (`src/agents/agent1_intake_parser.py`'s `_deterministic_fallback_parse`) for genuinely unscripted input in mock mode, instead of raising an error. Nothing to configure — it only engages when no `mock_response` was supplied.
+
+Both came out of a deliberate comparison against a teammate's repo, documented in full — what was adopted, what wasn't, and exactly how to revert — in `docs/comparing-foos-repo.md`.
 
 ## Project layout
 
@@ -79,7 +92,8 @@ All 7 scenario keys (see `data/trial-projects.json`'s `scenario_index`, or §12 
 - `SUBMISSION-CHECKLIST.md` — hackathon submission requirements, mapped to what's ready
 - `DEMO-TRANSCRIPT.md` — shot list for the required demo video, generated from a real run
 - `data/` — 100 synthetic trial projects, Playbook, PVP, political, and regulatory docs
-- `src/` — agents, orchestration (state machine, guardrails), db, notifications, LLM client
+- `src/` — agents, orchestration (state machine, guardrails), db, notifications, LLM client (`src/llm/client.py` for text, `src/llm/embeddings.py` for the optional real-embeddings backend)
 - `scripts/demo_engine.py` — shared logic for running a scenario (seeding, pipeline, rendering); `demo_server.py` (browser composer) and `run_demo.py` (CLI) both call into it
 - `dashboard/` — rendered HTML output (topline, visualizer, comments, notifications, activity feed)
-- `tests/` — the 54 acceptance checks across all 5 build phases
+- `tests/` — the 159 acceptance checks across all 11 build phases
+- `docs/comparing-foos-repo.md` — the teammate-repo comparison this session's upversion came from: what was adopted, what was deliberately skipped, and the exact rollback plan

@@ -39,17 +39,17 @@ body{font-family:-apple-system,Helvetica,Arial,sans-serif;margin:1rem;padding:0;
 their analysis. Nothing else runs (no acceptance, no notification, no project ID) until a PMO
 reviews this and presses Accept or Reject below.</div>
 <div class="summary">
-<b>Helpdesk triage chatbot pilot</b><br>
-Objective: Internal IT helpdesk tickets take too long to triage manually<br>
-Solution: A lightweight chatbot pilot to auto-triage common helpdesk requests<br>
-Size of price: $80,000 · CAPEX: $35,000<br>
-Expected launch: 2026-11-01<br>
-Team assigned: Alex Rivera (1 member) — staffing determined at intake; once accepted, ongoing team/resource
+<b>GDPR consent-audit automation</b><br>
+Objective: An upcoming GDPR consent-audit deadline requires a faster review process than manual spreadsheets allow<br>
+Solution: An automated consent-audit trail and reporting layer for EU customer data handling<br>
+Size of price: $260,000 · CAPEX: $120,000<br>
+Expected launch: 2026-10-01<br>
+Team assigned: Elin Berger, Marco Rossi (2 members) — staffing determined at intake; once accepted, ongoing team/resource
 availability is tracked the same way as risk and schedule
 </div>
 <div class="budget-flag ok">
-  <div class="headline">✓ Within North America's CAPEX budget</div>
-  Committed before this project: $0 · After: $35,000 of $1,500,000 budget
+  <div class="headline">✓ Within Europe's CAPEX budget</div>
+  Committed before this project: $0 · After: $120,000 of $650,000 budget
   (100% headroom remaining before this project)<br>
   Per playbook.md's Portfolio Prioritization policy, this headroom level points to: <b>best ROI-ratio projects first (headroom is comfortable)</b>
 </div>
@@ -62,7 +62,7 @@ availability is tracked the same way as risk and schedule
 <div class="finding">
   <div class="who">Agent 6 · Knowledge Cross-Checker</div>
   <div class="verdict aligned">Verdict: aligned</div>
-  <div class="citation">"AI-enabled operational tooling, supply chain digitization, customer-facing automation"</div>
+  <div class="citation">"Europe (only for regulatory/compliance-driven projects)"</div>
 </div>
 <div class="accept-panel">
   <label>PMO comment (optional — included in the acceptance notification, e.g. praise or a watch-out to track post-acceptance)</label>
@@ -99,7 +99,7 @@ function submitDecision(decision) {
     body.set('reason', document.getElementById('reason-field').value);
     body.set('pmo_comment', document.getElementById('comment-field').value);
   }
-  fetch('/gate2/SUB-CASE9/' + decision, {
+  fetch('/gate2/SUB-CASE10/' + decision, {
     method: 'POST',
     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
     body: body.toString(),
