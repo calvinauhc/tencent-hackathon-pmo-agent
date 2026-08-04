@@ -79,10 +79,17 @@ All 7 scenario keys (see `data/trial-projects.json`'s `scenario_index`, or §12 
 
 Two optional, additive upgrades on top of mock mode — both off by default, both fall back cleanly if unset or if the real call fails, neither changes any existing test:
 
-- **`VOYAGE_API_KEY`** — Agent 2's duplicate check uses real Voyage AI embeddings instead of the default TF-IDF stand-in (`src/llm/embeddings.py`). Absent the key, or if a real call ever fails, it falls straight back to TF-IDF.
+- **`USE_OLLAMA_EMBEDDINGS=1`** — Agent 2's duplicate check uses real local embeddings via [Ollama](https://ollama.com) instead of the default TF-IDF stand-in (`src/llm/embeddings.py`). Requires Ollama actually running locally:
+  ```
+  ollama serve                    # starts the local daemon (default port 11434)
+  ollama pull all-minilm          # one-time model download (~46MB, the default model)
+  export USE_OLLAMA_EMBEDDINGS=1
+  python3 scripts/demo_server.py
+  ```
+  Absent the env var, or if Ollama isn't running / times out / the model isn't pulled, Agent 2 falls straight back to TF-IDF automatically — no crash, no hang (3-second timeout by default, tunable via `OLLAMA_TIMEOUT_SECONDS`). Model is configurable via `OLLAMA_EMBED_MODEL` if you'd rather use something like `embeddinggemma` or `qwen3-embedding` (see [Ollama's embedding models](https://docs.ollama.com/capabilities/embeddings)).
 - Agent 1's intake parser now has a real deterministic fallback (`src/agents/agent1_intake_parser.py`'s `_deterministic_fallback_parse`) for genuinely unscripted input in mock mode, instead of raising an error. Nothing to configure — it only engages when no `mock_response` was supplied.
 
-Both came out of a deliberate comparison against a teammate's repo, documented in full — what was adopted, what wasn't, and exactly how to revert — in `docs/comparing-foos-repo.md`.
+Both came out of a deliberate comparison against a teammate's repo, documented in full — what was adopted, what wasn't, and exactly how to revert — in `docs/comparing-foos-repo.md`. (The embeddings upgrade originally used a hosted API, Voyage AI, before being swapped to Ollama — same doc explains why.)
 
 ## Project layout
 
