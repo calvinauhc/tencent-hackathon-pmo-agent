@@ -4,9 +4,11 @@ Similarity: local TF-IDF + cosine as the default, demo-scope stand-in for real e
 (§4, §16) — this is still what every existing test exercises and still what runs with zero setup.
 
 Optional real-embeddings upgrade ("comparing Foo's repo", docs/comparing-foos-repo.md): if
-VOYAGE_API_KEY is set, find_closest_match() tries a real Voyage AI embedding call first and only
-falls back to TF-IDF if that call fails for any reason — never raises past this function. Absent
-the key (the default), behavior is byte-for-byte identical to before this upgrade.
+USE_OLLAMA_EMBEDDINGS=1 is set, find_closest_match() tries a real local Ollama embedding call first
+and only falls back to TF-IDF if that call fails for any reason (daemon not running, timed out,
+model not pulled) — never raises past this function. Absent the flag (the default), behavior is
+byte-for-byte identical to before this upgrade. (An earlier version of this upgrade used a hosted
+API — Voyage AI — instead of Ollama; see src/llm/embeddings.py's docstring for why it was swapped.)
 
 Only the borderline band (0.65-0.85) calls an LLM (Sonnet, §16) for adjudication.
 

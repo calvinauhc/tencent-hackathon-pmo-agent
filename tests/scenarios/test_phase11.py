@@ -2,12 +2,16 @@
 Phase 11 verification — "comparing Foo's repo" upversion: the optional real-embeddings backend for
 Agent 2 (src/llm/embeddings.py), and the fallback contract that makes it safe to have merged.
 
-Cannot call the real Voyage AI API from this test (no key committed, and shouldn't be — see
-docs/comparing-foos-repo.md). Everything here either exercises the real module without a key (the
-default, always-on path) or monkeypatches src.llm.embeddings to simulate a key being present, so the
-fallback/failure logic in agent2_duplicate_checker.py gets real coverage without a network call.
+Backend is Ollama (local daemon), not the hosted Voyage AI API this module originally shipped with
+— see src/llm/embeddings.py's docstring for why. Cannot call a real Ollama daemon from this test
+(this sandbox's network allowlist blocks ollama.com, so nothing could be installed here even for a
+one-off manual check) — real end-to-end verification has to happen on a machine with Ollama actually
+running, not in CI. Everything here either exercises the real module with the opt-in flag unset (the
+default, always-on path, needs no daemon) or monkeypatches urllib/the module itself to simulate a
+daemon being present, so the request shape, response parsing, and fallback/failure logic in
+agent2_duplicate_checker.py all get real coverage without a network call.
 """
-import sys, os
+import sys, os, json, io
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.db.trial_loader import load_trial_data
 from src.llm import embeddings as embeddings_backend
@@ -23,8 +27,14 @@ def check(name, cond, detail=""):
 projects, idx = load_trial_data()
 by_id = {p.submission_id: p for p in projects}
 
-# --- 11.1 default state: no VOYAGE_API_KEY in this environment ---
-check("11.1 REAL_EMBEDDINGS_AVAILABLE is False without a key", embeddings_backend.REAL_EMBEDDINGS_AVAILABLE is False, embeddings_backend.REAL_EMBEDDINGS_AVAILABLE)
+# --- 11.1 default state: USE_OLLAMA_EMBEDDINGS not set in this environment ---
+check("11.1 REAL_EMBEDDINGS_AVAILABLE is False without the opt-in flag", embeddings_backend.REAL_EMBEDDINGS_AVAILABLE is False, embeddings_backend.REAL_EMBEDDINGS_AVAILABLE)
+
+# --- 11.1b _truthy() parses common "on" spellings and rejects everything else ---
+truthy_cases = [("1", True), ("true", True), ("True", True), ("yes", True), ("on", True),
+                ("0", False), ("false", False), ("", False), (None, False), ("nope", False)]
+truthy_ok = all(embeddings_backend._truthy(v) == expected for v, expected in truthy_cases)
+check("11.1b _truthy() correctly parses every case", truthy_ok, truthy_cases)
 
 # --- 11.2 get_embeddings() refuses to silently fake a vector ---
 raised = False
@@ -32,12 +42,64 @@ try:
     embeddings_backend.get_embeddings(["some text"])
 except RuntimeError as e:
     raised = True
-    check("11.2 get_embeddings() raises RuntimeError with no key (never fakes a vector)", "VOYAGE_API_KEY" in str(e), str(e))
+    check("11.2 get_embeddings() raises RuntimeError with the flag unset (never fakes a vector)", "USE_OLLAMA_EMBEDDINGS" in str(e), str(e))
 check("11.2 get_embeddings() actually raised", raised)
 
-# --- 11.3 _real_embedding_similarities returns None (triggers TF-IDF fallback) when no key is set ---
+# --- 11.2b get_embeddings() sends the correct request shape to Ollama's real /api/embed contract ---
+# (per docs.ollama.com/capabilities/embeddings: POST {model, input}, response has "embeddings")
+class _FakeHTTPResponse:
+    def __init__(self, body_dict):
+        self._body = json.dumps(body_dict).encode("utf-8")
+    def read(self):
+        return self._body
+    def __enter__(self):
+        return self
+    def __exit__(self, *a):
+        return False
+
+captured_request = {}
+def _fake_urlopen_ok(req, timeout=None):
+    captured_request["url"] = req.full_url
+    captured_request["method"] = req.get_method()
+    captured_request["body"] = json.loads(req.data.decode("utf-8"))
+    captured_request["timeout"] = timeout
+    return _FakeHTTPResponse({"embeddings": [[0.1, 0.2], [0.3, 0.4]]})
+
+real_urlopen = embeddings_backend.urllib.request.urlopen
+real_enabled = embeddings_backend.REAL_EMBEDDINGS_AVAILABLE
+embeddings_backend.REAL_EMBEDDINGS_AVAILABLE = True
+embeddings_backend.urllib.request.urlopen = _fake_urlopen_ok
+try:
+    vectors = embeddings_backend.get_embeddings(["text A", "text B"])
+    check("11.2b calls Ollama's real /api/embed path", captured_request["url"].endswith("/api/embed"), captured_request["url"])
+    check("11.2b POSTs (not GETs)", captured_request["method"] == "POST", captured_request["method"])
+    check("11.2b request body matches Ollama's documented shape", captured_request["body"] == {"model": embeddings_backend.OLLAMA_EMBED_MODEL, "input": ["text A", "text B"]}, captured_request["body"])
+    check("11.2b uses a short timeout so a dead daemon can't hang a live demo", 0 < captured_request["timeout"] <= 10, captured_request["timeout"])
+    check("11.2b parses the real 'embeddings' response key correctly", vectors == [[0.1, 0.2], [0.3, 0.4]], vectors)
+finally:
+    embeddings_backend.urllib.request.urlopen = real_urlopen
+    embeddings_backend.REAL_EMBEDDINGS_AVAILABLE = real_enabled
+
+# --- 11.2c a malformed response (wrong vector count) raises rather than silently mismatching ---
+def _fake_urlopen_short(req, timeout=None):
+    return _FakeHTTPResponse({"embeddings": [[0.1, 0.2]]})  # asked for 2 texts, got 1 back
+
+embeddings_backend.REAL_EMBEDDINGS_AVAILABLE = True
+embeddings_backend.urllib.request.urlopen = _fake_urlopen_short
+try:
+    raised_short = False
+    try:
+        embeddings_backend.get_embeddings(["text A", "text B"])
+    except RuntimeError:
+        raised_short = True
+    check("11.2c a response with the wrong vector count raises instead of mismatching silently", raised_short)
+finally:
+    embeddings_backend.urllib.request.urlopen = real_urlopen
+    embeddings_backend.REAL_EMBEDDINGS_AVAILABLE = real_enabled
+
+# --- 11.3 _real_embedding_similarities returns None (triggers TF-IDF fallback) when not opted in ---
 sims = agent2._real_embedding_similarities("some new project text", ["some existing project text"])
-check("11.3 _real_embedding_similarities returns None with no key present", sims is None, sims)
+check("11.3 _real_embedding_similarities returns None with the flag unset", sims is None, sims)
 
 # --- 11.4 find_closest_match still works end-to-end via the TF-IDF fallback (unchanged behavior) ---
 existing = [p for p in projects if p.status in ("accepted", "in_progress", "completed")][:5]

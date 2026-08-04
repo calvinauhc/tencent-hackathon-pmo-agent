@@ -4,17 +4,27 @@
 
 This doc exists so that if any of this needs to be reverted later — for any reason — the next person (or a future session) doesn't have to reconstruct *why* these changes exist or *what exactly* to undo. Read this before touching anything described below.
 
+## Revision history on this doc
+
+This upversion happened in two passes, not one — worth knowing before you read "What was adopted" below at face value:
+
+1. **First pass** (tag `submission-stable-v1` → merged to `main`): real embeddings for Agent 2 built against **Voyage AI**, a hosted API, specifically chosen *to avoid* a local-daemon dependency like Ollama's.
+2. **Second pass** (tag `pre-ollama-swap` on top of that merge, branch `ollama-embeddings-swap`): after further discussion, the user explicitly chose to accept the local-daemon dependency after all — in exchange for zero API cost and zero network calls at inference time — on the condition that TF-IDF is the backup if Ollama isn't responding. `src/llm/embeddings.py` was rewritten to call **Ollama** instead of Voyage. The external contract Agent 2 depends on (`REAL_EMBEDDINGS_AVAILABLE`, `get_embeddings()`) didn't change, so `agent2_duplicate_checker.py` itself needed no changes for this swap.
+
+Everything below describes the **current** (Ollama) state unless marked otherwise. If you need the Voyage version back for any reason, it's fully intact at tag `pre-ollama-swap`.
+
 ## Rollback — do this first if you need to revert
 
 ```bash
-git tag                          # confirm submission-stable-v1 exists
-git log --oneline main..comparing-foos-repo   # see everything this branch added, if merged
+git tag                          # confirm submission-stable-v1 AND pre-ollama-swap both exist
+git log --oneline main..comparing-foos-repo        # everything the first pass added, if that branch is unmerged
+git log --oneline main..ollama-embeddings-swap      # everything the Ollama swap added, if that branch is unmerged
 ```
 
-- **If this branch was never merged into `main`:** nothing to do. `main` was never touched — just don't merge the `comparing-foos-repo` branch.
-- **If it WAS merged and needs backing out entirely:** `git checkout main && git reset --hard submission-stable-v1` (only safe if nothing else has been built on top of the merge — check `git log` first).
-- **If it was merged and only PART of it needs backing out:** `git revert <merge-commit-sha>` is safer than a hard reset — undoes the changeset while keeping history intact for anything built afterward.
-- **Fastest partial revert, no git needed at all:** everything shipped here is off by default and additive (see "How this was built to be revertible" below). Simply don't set `VOYAGE_API_KEY`, and the system behaves exactly as it did at `submission-stable-v1` — the code can stay merged and simply go unused.
+- **Revert everything from both passes, back to before either upversion:** `git checkout main && git reset --hard submission-stable-v1`.
+- **Keep the real-embeddings feature but go back to Voyage instead of Ollama:** `git checkout main && git reset --hard pre-ollama-swap` (only safe if nothing else has been built on top since — check `git log` first).
+- **Back out only part of it, keeping everything built afterward intact:** `git revert <merge-commit-sha>` is safer than a hard reset either way.
+- **Fastest partial revert, no git needed at all:** everything shipped here is off by default and additive (see "How this was built to be revertible" below). Simply don't set `USE_OLLAMA_EMBEDDINGS`, and the system behaves exactly as it did at `submission-stable-v1` — the code can stay merged and simply go unused.
 
 ## Scoring framework used to judge what was worth adopting
 
@@ -46,16 +56,18 @@ Only items #1 and #2 above were built. #3 and #4 were judged lower priority give
 
 ### 1. Real embeddings for Agent 2 (`src/llm/embeddings.py`, new file)
 
-**Design deliberately differs from Foo's approach.** He uses Ollama (local daemon + downloaded model weights) + ChromaDB. Not copied as-is:
+**Current state (second pass): Ollama, matching Foo's choice directly.** `nomic-embed-text` was his model; this defaults to `all-minilm` instead (smaller/faster pull, ~46MB, good for a demo machine — configurable via `OLLAMA_EMBED_MODEL` if you want his exact model or something larger like `embeddinggemma`/`qwen3-embedding`). Requires `ollama serve` running locally and the model pulled — see README.md's Mock mode section for the exact commands.
 
-- Ollama needs a local daemon running and models pulled on whatever machine actually demos this — a real external dependency this project has no way to guarantee at judging time, breaking the existing "just run one script" demo-reliability property.
-- The free-but-local alternative, `sentence-transformers`, pulls in PyTorch + model weights — a large (likely 500MB-2GB), slow local install. Not something to add silently this close to a deadline.
-- Instead: **Voyage AI**, Anthropic's own recommended embeddings partner, called via plain HTTPS (`urllib.request`, stdlib only — no new pip dependency). Same category of trade-off already accepted for the real LLM tier: network + a key required when enabled, nothing new.
+**First pass deliberately avoided this** (see "Revision history" above) — Ollama needs a local daemon running on whatever machine actually demos this, a real external dependency this project has no way to guarantee at judging time, breaking the existing "just run one script" demo-reliability property. That risk is exactly why Voyage AI (a hosted API) was chosen first. **The user explicitly re-evaluated and accepted that risk** in exchange for zero ongoing API cost and zero network calls at inference time, on one hard condition: **TF-IDF must be the backup if Ollama isn't responding.** That condition was already guaranteed by the architecture built in the first pass — `agent2_duplicate_checker.py`'s fallback logic doesn't know or care which real backend is behind `get_embeddings()`, it just catches any failure and falls back. So the swap only touched `src/llm/embeddings.py` internals; the safety guarantee didn't need to be rebuilt.
 
-**Behavior:**
-- `VOYAGE_API_KEY` unset (the default) → `REAL_EMBEDDINGS_AVAILABLE = False` → `agent2_duplicate_checker.find_closest_match()` behaves **exactly** as it did before this change — TF-IDF + cosine, byte-for-byte. All 140 pre-existing tests pass completely untouched.
-- `VOYAGE_API_KEY` set → real embedding call attempted first; **any failure** (network, bad key, rate limit) is caught and logs a warning, then falls back to TF-IDF rather than crashing duplicate-checking.
-- `src/agents/agent2_duplicate_checker.py` changed: `find_closest_match()` now tries `_real_embedding_similarities()` first, only computing TF-IDF if that returns `None`.
+The other rejected local option from the first pass, `sentence-transformers` (pulls in PyTorch, likely 300-500MB), is still not used — Ollama was the more direct match to what was actually requested.
+
+**Behavior (same contract both passes, only the real backend changed):**
+- `USE_OLLAMA_EMBEDDINGS` unset (the default) → `REAL_EMBEDDINGS_AVAILABLE = False` → `agent2_duplicate_checker.find_closest_match()` behaves **exactly** as it did before either upversion pass — TF-IDF + cosine, byte-for-byte. All 140 pre-existing tests pass completely untouched.
+- `USE_OLLAMA_EMBEDDINGS=1` set → real embedding call attempted first (`POST http://localhost:11434/api/embed`, a 3-second default timeout so a dead daemon can't hang a live demo — tunable via `OLLAMA_TIMEOUT_SECONDS`); **any failure** (daemon not running, timeout, model not pulled, malformed response) is caught, logs a warning, and falls back to TF-IDF rather than crashing duplicate-checking.
+- `src/agents/agent2_duplicate_checker.py` itself: unchanged by the Ollama swap. `find_closest_match()` still tries `_real_embedding_similarities()` first, only computing TF-IDF if that returns `None` — exactly as built in the first pass.
+
+**Not independently verified against a real running Ollama instance.** This sandbox's network allowlist blocks `ollama.com`, so the binary/model couldn't be installed here to test end-to-end. Verified instead via careful reading of Ollama's own `/api/embed` documentation and thorough monkeypatched tests (`tests/scenarios/test_phase11.py`, checks 11.2b/11.2c) that construct the exact request Ollama expects and parse the exact response shape it returns — but the very first real run needs to happen on a machine with Ollama actually installed, not assumed to already work from this alone.
 
 **CodeBuddy porting note added** to `TECH-SPEC.md` §4: this is now a real, working bridge toward the pgvector production target, not just a documented intention — the remaining gap is persisting vectors in `kb_documents` instead of recomputing per call.
 
@@ -80,16 +92,17 @@ Only items #1 and #2 above were built. #3 and #4 were judged lower priority give
 - **Gmail IMAP listener** — genuinely good, would need real inbox credentials and ongoing maintenance (a live demo dependency on an actual mailbox being reachable at judging time is its own reliability risk, the same category of concern that ruled out Ollama above). Left for later if there's time.
 - **Runtime CAG document upload portal** — low effort to add (Agent 6 already reads flat files from `data/`; an upload endpoint writing into that folder gets most of the value), but judged lower priority than the two harness items above given limited remaining time.
 - **LangSmith** — see "What Foo's repo does well" above. Actively decided against, not just deferred.
-- **Ollama + ChromaDB, sentence-transformers** — considered and rejected in favor of the hosted-API approach for embeddings; see reasoning under item 1 above.
+- **ChromaDB** — Ollama was adopted for the embedding model itself (second pass, see "Revision history" above), but not Foo's ChromaDB vector store alongside it. Vectors are recomputed per call, not persisted — matches this build's existing TF-IDF behavior and keeps the change scoped to "swap the similarity backend," not "add a new persistent store." A real vector column (`kb_documents`, pgvector) is still the actual CodeBuddy-port target either way (§4).
+- **sentence-transformers** — considered for the embeddings work and rejected in favor of a hosted API in the first pass, then superseded by Ollama in the second; see item 1 above for the full reasoning trail.
 - **Adopting LangChain / Pydantic wholesale** — both would be larger architectural changes than the value they'd add this close to a deadline, given this codebase already has working equivalents (hand-rolled state machine + guardrails; `validate_enum()`).
 
 ## How this was built to be revertible
 
 Two layers, matching the plan agreed before any code was touched:
 
-1. **Git-level:** tag `submission-stable-v1` on `main` before this work started; all changes live on branch `comparing-foos-repo` until explicitly merged.
-2. **Code-level (the one that matters mid-demo):** every change here is additive and gated by an environment variable that defaults to "off, behave exactly as before." No existing code path's default behavior changed. This was verified, not assumed — the full 140-check suite that existed before this upversion still passes unmodified, plus 19 new checks in `tests/scenarios/test_phase11.py` covering the new paths specifically (including the failure/fallback behavior, not just the happy path).
+1. **Git-level:** tag `submission-stable-v1` on `main` before the first pass started (branch `comparing-foos-repo`); a second tag `pre-ollama-swap` before the Ollama swap started (branch `ollama-embeddings-swap`), once the first pass was already merged and pushed. Two tags, two independent rollback points — see "Revision history" and "Rollback" above.
+2. **Code-level (the one that matters mid-demo):** every change here is additive and gated by an environment variable that defaults to "off, behave exactly as before." No existing code path's default behavior changed, in either pass. This was verified, not assumed — the full 140-check suite that existed before either pass still passes unmodified, plus checks in `tests/scenarios/test_phase11.py` covering the new paths specifically (including the failure/fallback behavior, not just the happy path) — 19 checks after the first pass, 26 after the Ollama swap added request/response-contract coverage.
 
 ## Test evidence
 
-`./run_all_tests.sh` — 159/159 checks passed across 11 phases (140 pre-existing + 19 new in Phase 11) as of this upversion. Phase 11 specifically covers: default behavior unchanged with no `VOYAGE_API_KEY`, `get_embeddings()` refusing to fake a vector, the real-embeddings path actually being exercised and picking the correct match under a monkeypatched backend, a simulated network failure falling back to TF-IDF instead of crashing, the deterministic fallback parser's field extraction against a realistic email, `parse_intake()` no longer crashing on unscripted input, and scripted-mock behavior being completely unchanged (regression guard).
+`./run_all_tests.sh` — 166/166 checks passed across 11 phases (140 pre-existing + 26 in Phase 11, updated for the Ollama swap) as of this upversion. Phase 11 specifically covers: default behavior unchanged with `USE_OLLAMA_EMBEDDINGS` unset, `_truthy()`'s env-var parsing, `get_embeddings()` refusing to fake a vector, a monkeypatched-at-the-`urllib`-level check that the real request matches Ollama's documented `/api/embed` contract exactly (URL, method, body shape, timeout) and that the response's `embeddings` key is parsed correctly, a malformed/short response raising instead of silently mismatching vectors to projects, the real-embeddings path actually being exercised and picking the correct match under a monkeypatched backend, a simulated failure falling back to TF-IDF instead of crashing, the deterministic fallback parser's field extraction against a realistic email, `parse_intake()` no longer crashing on unscripted input, and scripted-mock behavior being completely unchanged (regression guard). What this suite does **not** cover: an actual live call to a running Ollama daemon — see "Not independently verified" under item 1 above.
