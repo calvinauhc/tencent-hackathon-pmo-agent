@@ -39,17 +39,17 @@ body{font-family:-apple-system,Helvetica,Arial,sans-serif;margin:1rem;padding:0;
 their analysis. Nothing else runs (no acceptance, no notification, no project ID) until a PMO
 reviews this and presses Accept or Reject below.</div>
 <div class="summary">
-<b>Helpdesk triage chatbot pilot</b><br>
-Objective: Internal IT helpdesk tickets take too long to triage manually<br>
-Solution: A lightweight chatbot pilot to auto-triage common helpdesk requests<br>
-Size of price: $80,000 · CAPEX: $35,000<br>
-Expected launch: 2026-11-01<br>
-Team assigned: Alex Rivera (1 member) — staffing determined at intake; once accepted, ongoing team/resource
+<b>Regional demand forecasting agent</b><br>
+Objective: Regional demand spikes catch inventory planning off guard, causing stockouts<br>
+Solution: An ML-based demand forecasting layer integrated with existing inventory and sales data<br>
+Size of price: $420,000 · CAPEX: $300,000<br>
+Expected launch: 2026-12-01<br>
+Team assigned: Nadia Suryani, Budi Santoso (2 members) — staffing determined at intake; once accepted, ongoing team/resource
 availability is tracked the same way as risk and schedule
 </div>
 <div class="budget-flag ok">
-  <div class="headline">✓ Within North America's CAPEX budget</div>
-  Committed before this project: $0 · After: $35,000 of $1,500,000 budget
+  <div class="headline">✓ Within Southeast Asia's CAPEX budget</div>
+  Committed before this project: $0 · After: $300,000 of $1,200,000 budget
   (100% headroom remaining before this project)<br>
   Per playbook.md's Portfolio Prioritization policy, this headroom level points to: <b>best ROI-ratio projects first (headroom is comfortable)</b>
 </div>
@@ -99,7 +99,7 @@ function submitDecision(decision) {
     body.set('reason', document.getElementById('reason-field').value);
     body.set('pmo_comment', document.getElementById('comment-field').value);
   }
-  fetch('/gate2/SUB-CASE9/' + decision, {
+  fetch('/gate2/SUB-CASE8A/' + decision, {
     method: 'POST',
     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
     body: body.toString(),

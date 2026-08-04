@@ -1,7 +1,13 @@
 """
 Agent 2 — Duplicate Checker. §2, §4.
-Similarity: local TF-IDF + cosine as a demo-scope stand-in for real embeddings/pgvector (§4, §16) —
-swap for a real embedding model + kb_documents-style vector column when porting to CodeBuddy.
+Similarity: local TF-IDF + cosine as the default, demo-scope stand-in for real embeddings/pgvector
+(§4, §16) — this is still what every existing test exercises and still what runs with zero setup.
+
+Optional real-embeddings upgrade ("comparing Foo's repo", docs/comparing-foos-repo.md): if
+VOYAGE_API_KEY is set, find_closest_match() tries a real Voyage AI embedding call first and only
+falls back to TF-IDF if that call fails for any reason — never raises past this function. Absent
+the key (the default), behavior is byte-for-byte identical to before this upgrade.
+
 Only the borderline band (0.65-0.85) calls an LLM (Sonnet, §16) for adjudication.
 
 §7.2.4 extends the corpus text for a *completed* project to include its published OPL (§7.2.3), not
@@ -15,6 +21,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from src.shared.config import DUPLICATE_AUTO_FLAG_THRESHOLD, DUPLICATE_NOT_DUPLICATE_THRESHOLD
 from src.llm.client import llm
+from src.llm import embeddings as embeddings_backend
 from src.knowledge.opl_loader import load_opl
 
 def _text_of(project) -> str:
@@ -22,13 +29,36 @@ def _text_of(project) -> str:
     opl_text = load_opl(getattr(project, "project_id", None))
     return f"{base} {opl_text}".strip() if opl_text else base
 
+def _real_embedding_similarities(new_text, existing_texts):
+    """Returns a similarity array (same shape/semantics as the TF-IDF path) using real Voyage
+    embeddings, or None if the real backend isn't available/fails. Isolated in its own function so
+    find_closest_match's fallback logic stays simple to read."""
+    if not embeddings_backend.REAL_EMBEDDINGS_AVAILABLE:
+        return None
+    try:
+        vectors = embeddings_backend.get_embeddings([new_text] + existing_texts)
+    except Exception as e:
+        # Network hiccup, bad/revoked key, rate limit — never let a real-embeddings failure take
+        # down duplicate checking. Fall back to TF-IDF exactly as if no key had been set.
+        print(f"[Agent2 Warning] Real embeddings call failed: {e}. Falling back to TF-IDF.")
+        return None
+    sims = cosine_similarity([vectors[0]], vectors[1:]).flatten()
+    return sims
+
 def find_closest_match(new_project, existing_projects):
     """Returns (best_match_project, similarity_score) or (None, 0.0) if no existing projects."""
-    corpus = [_text_of(new_project)] + [_text_of(p) for p in existing_projects]
-    if not existing_projects or not corpus[0].strip():
+    if not existing_projects:
         return None, 0.0
-    vect = TfidfVectorizer().fit_transform(corpus)
-    sims = cosine_similarity(vect[0:1], vect[1:]).flatten()
+    new_text = _text_of(new_project)
+    if not new_text.strip():
+        return None, 0.0
+    existing_texts = [_text_of(p) for p in existing_projects]
+
+    sims = _real_embedding_similarities(new_text, existing_texts)
+    if sims is None:
+        vect = TfidfVectorizer().fit_transform([new_text] + existing_texts)
+        sims = cosine_similarity(vect[0:1], vect[1:]).flatten()
+
     best_idx = sims.argmax()
     return existing_projects[best_idx], float(sims[best_idx])
 
