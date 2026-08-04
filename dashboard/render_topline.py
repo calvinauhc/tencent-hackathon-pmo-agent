@@ -7,25 +7,37 @@ this is the equivalent view, rendered server-side once instead of served continu
 
 Two additions on top of the original topline (both requested together, see docs/comparing-foos-repo.md):
 1. A dark metric-card + percentage-bar summary block (Total Projects / Portfolio value / Approved
-   rate / Avg success likelihood, plus Status and Strategic Alignment distribution panels), styled
-   after a reference dashboard screenshot. Adopted the screenshot's CARD/BAR LAYOUT, not a full dark
-   re-theme of the app — every other page (composer, visualizer, activity, Gate 2/3) stays the
-   existing light-cream look, so this is a scoped judgment call, not a silent app-wide restyle.
-   Strategic Alignment is derived live from audit_log (get_latest_agent_payload), never a stored
-   column — most seeded-but-not-actually-run trial rows genuinely have no Agent 6 payload in a given
-   demo session (fresh=True wipes/reseeds on every run), so they honestly land in "Not yet assessed"
-   rather than a guessed verdict.
+   rate / Avg success likelihood), styled after a reference dashboard screenshot. Adopted the
+   screenshot's CARD/BAR LAYOUT, not a full dark re-theme of the app — every other page (composer,
+   visualizer, activity, Gate 2/3) stays the existing light-cream look, so this is a scoped judgment
+   call, not a silent app-wide restyle.
 2. §5.3's Periodic Gate 2 Review queue, embedded directly (dashboard/render_gate2_queue.py's
    render_queue_fragment()) between "needs attention" and the project table — the composer's old
    left-panel batch buttons (cases 8a/8b/9/10) are gone; this embedded view plus its own
    Open/Close-batch and Review/Override buttons are now the one real entry point.
+
+The distribution panels (below the metric cards) are five real, computed-from-real-data governance
+views, not a fixed pair — Status Distribution plus four requested "top management purview" metrics:
+Strategic Coverage (Aligned vs Orphaned, derived live from Agent 6's audit_log verdict — most
+seeded-but-not-actually-run trial rows genuinely have no Agent 6 payload in a given demo session
+(fresh=True wipes/reseeds on every run), so they honestly count as orphaned rather than a guessed
+"aligned"), CAPEX Funding Coverage (fully/partially/unfunded, from capex_funded_pct), Predictive
+Portfolio Health (Agent 10's real per-project success-score bucketed High/Medium/Low/Under
+monitoring/Not yet tracked — the single "Avg success likelihood" card above can hide a bimodal
+spread this doesn't), and Portfolio Value by Business Unit (real business_impact_usd summed per BU,
+a concentration-risk view). Three OTHER requested metrics — Allocation Variance (Actual vs Planned
+Capacity), CapEx/OpEx Strategic Ratio, and Cross-Functional Dependency Resolution Time — are
+deliberately NOT here: none of the fields they'd need (planned/actual capacity, OpEx, dependency
+tracking) exist anywhere in this schema (src/shared/schemas.py's Project dataclass), and fabricating
+numbers for them would break this project's own "never guess/never invent a figure" discipline
+(the same principle behind Agent 1/11's deterministic parsers and this section's own Agent 6
+fallback). Add the real fields first if these become genuinely wanted.
 """
-import sys, os, re, html as html_lib
+import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from src.db.client import get_connection
 from src.db.repositories import get_latest_agent_payload
 from src.agents.agent10_success_predictor import predict_or_monitor
-from src.agents.agent11_update_logger import UPDATE_BODY_PLACEHOLDER
 from dashboard.render_gate2_queue import render_queue_fragment
 
 CSS = """
@@ -38,7 +50,7 @@ body{font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:960px;margin
 .mcard{background:#12213f;border-radius:10px;padding:14px 16px;color:#fff}
 .mcard .mlabel{font-size:11px;color:#93a8d0;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
 .mcard .mnum{font-size:26px;font-weight:700}
-.distros{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.distros{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:20px}
 .distro{background:#12213f;border-radius:10px;padding:14px 16px;color:#fff}
 .distro h4{font-size:11px;margin:0 0 12px;color:#93a8d0;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
 .drow{margin-bottom:9px}
@@ -80,25 +92,6 @@ button:hover{background:#2c6fb3}
 .override-form button{padding:3px 8px;font-size:11px;background:#ef9f27}
 .override-form button:hover{background:#d98a1a}
 .empty{color:#888;font-size:13px;padding:20px;text-align:center}
-
-/* Interactive per-project update compose panel */
-#update-compose{border:1px solid #e5e3dc;border-radius:10px;padding:14px 16px;background:#fff;margin-bottom:20px}
-#update-compose label{font-size:11px;color:#5f5e5a;display:block;margin-bottom:3px;margin-top:10px}
-#update-compose label:first-child{margin-top:0}
-#update-compose select,#update-compose input,#update-compose textarea{width:100%;font-size:12px;font-family:inherit;padding:6px 8px;border:1px solid #e5e3dc;border-radius:6px;box-sizing:border-box}
-#update-compose textarea{height:110px;resize:vertical}
-#update-compose .runbar{text-align:right;margin-top:12px}
-#update-compose .sub{color:#888;font-size:11px;margin-top:8px;line-height:1.5}
-/* Ghost-text body editor: the label before each colon is fixed, real text (contenteditable=false);
-   the hint after it is greyed-out ghost text that clears the instant you click into it, so you can
-   type the value straight away without re-typing or remembering the label. */
-#update-compose .body-editable{width:100%;font-size:12px;font-family:inherit;padding:8px;border:1px solid #e5e3dc;border-radius:6px;box-sizing:border-box;min-height:118px;line-height:1.8;cursor:text}
-#update-compose .body-editable:focus{outline:2px solid #d8d4c8;outline-offset:1px}
-#update-compose .uline{white-space:pre-wrap}
-#update-compose .uline.note-row{margin-top:10px}
-#update-compose .uline .lbl{color:#2a2a28}
-#update-compose .uline .ghost{color:#a8a49a}
-#update-compose .uline .filled{color:#2a2a28}
 """
 
 # Ordinal ranking so ascending sort reads green -> yellow -> red -> in-review, the same order the
@@ -109,6 +102,15 @@ _INDICATOR_RANK = {"green": 0, "yellow": 1, "red": 2}
 def _bar_row(label, count, total, color):
     pct = round(100 * count / total) if total else 0
     return (f'<div class="drow"><div class="dlabel"><span>{label}</span><span>{count} ({pct}%)</span></div>'
+            f'<div class="dbar"><div class="dbar-fill" style="width:{pct}%;background:{color}"></div></div></div>')
+
+
+def _bar_row_usd(label, value, total_value, color):
+    """Same bar, but the right-hand figure is a real dollar amount (e.g. Portfolio Value by Business
+    Unit) instead of a row count — _bar_row's count display would be misleading for a sum-of-money
+    metric."""
+    pct = round(100 * value / total_value) if total_value else 0
+    return (f'<div class="drow"><div class="dlabel"><span>{label}</span><span>${value/1000:.0f}K ({pct}%)</span></div>'
             f'<div class="dbar"><div class="dbar-fill" style="width:{pct}%;background:{color}"></div></div></div>')
 
 
@@ -129,11 +131,6 @@ def render():
     # slipping badly, §7.2/Gate 3's Cancel decision), which is real information distinct from a
     # proposal that was never approved in the first place.
     cancelled_rows = [r for r in all_rows if r["status"] == "cancelled"]
-    # Duplicate rejections are a real, distinguishable subset — Agent 2's rejection_reason always
-    # starts "Duplicate of ..." (src/agents/agent2_...). Everything else rejected (misaligned at
-    # Gate 1, incomplete at Agent 1, or a PMO Gate 2 rejection) buckets separately.
-    dup_rejected = [r for r in rejected_rows if "duplicate of" in (r["rejection_reason"] or "").lower()]
-    other_rejected = [r for r in rejected_rows if r not in dup_rejected]
 
     # Approved rate is computed over DECIDED intake proposals only (approved + rejected) —
     # draft/pmo_review/analysis rows haven't reached a decision yet, and cancelled projects WERE
@@ -162,9 +159,10 @@ def render():
     scores = [r["_pred_score"] for r in all_rows if r["_pred_status"] == "predicted"]
     avg_score = round(sum(scores) / len(scores)) if scores else 0
 
-    # --- Strategic Alignment Distribution — derived live from audit_log, never stored. Most seeded
-    # trial rows genuinely never ran through Agent 6 in a given session (fresh=True wipes/reseeds on
-    # every scenario run), so they land honestly in "Not yet assessed" rather than a guessed verdict. ---
+    # --- Strategic Coverage (Aligned vs Orphaned Initiatives) — derived live from audit_log, never
+    # stored. Most seeded trial rows genuinely never ran through Agent 6 in a given session
+    # (fresh=True wipes/reseeds on every scenario run), so anything without a real verdict counts as
+    # orphaned rather than a guessed "aligned". ---
     alignment_counts = {"aligned": 0, "partially_aligned": 0, "misaligned": 0, "inconclusive": 0, "unassessed": 0}
     for r in all_rows:
         pid = r["project_id"] or r["submission_id"]
@@ -174,6 +172,37 @@ def render():
             alignment_counts[verdict] += 1
         else:
             alignment_counts["unassessed"] += 1
+    coverage_aligned = alignment_counts["aligned"] + alignment_counts["partially_aligned"]
+    coverage_orphaned = total_projects - coverage_aligned
+
+    # --- Predictive Portfolio Health — Agent 10's real per-project prediction (_pred_status/
+    # _pred_score, just computed above), bucketed instead of only averaged. The single "Avg success
+    # likelihood" metric card can hide a bimodal spread (a handful of very low scores balanced out by
+    # high ones averaging to something reassuring) — a PMO scanning for risk needs the buckets, not
+    # just the mean. ---
+    health_counts = {"high": 0, "medium": 0, "low": 0, "under_monitoring": 0, "not_tracked": 0}
+    for r in all_rows:
+        if r["_pred_status"] == "predicted":
+            score = r["_pred_score"] or 0
+            if score >= 70:
+                health_counts["high"] += 1
+            elif score >= 40:
+                health_counts["medium"] += 1
+            else:
+                health_counts["low"] += 1
+        elif r["_pred_status"] == "under_monitoring":
+            health_counts["under_monitoring"] += 1
+        else:
+            health_counts["not_tracked"] += 1
+
+    # --- Portfolio Value by Business Unit — real business_impact_usd summed per BU across the same
+    # pipeline_rows scope as the "Portfolio value" metric card, so a PMO can see WHERE that total is
+    # concentrated (concentration risk), not just the single aggregate figure. ---
+    bu_totals = {}
+    for r in pipeline_rows:
+        bu = r["business_unit"] or "Unspecified"
+        bu_totals[bu] = bu_totals.get(bu, 0) + (r["business_impact_usd"] or 0)
+    bu_ranked = sorted(bu_totals.items(), key=lambda kv: kv[1], reverse=True)
 
     # --- the "active" table view — accepted/in_progress/completed/pmo_review/analysis rows, ordered
     # by recency. No LIMIT: the trial fixture only has 20 rows total (see TECH-SPEC.md §14), so a
@@ -193,6 +222,14 @@ def render():
     capex_needed = sum(r["capex_usd"] or 0 for r in scored)
     capex_funded = sum((r["capex_usd"] or 0) * (r["capex_funded_pct"] or 0) / 100 for r in scored)
     capex_pct = round(100 * capex_funded / capex_needed) if capex_needed else 0
+
+    # --- CAPEX Funding Coverage — only rows that actually need CAPEX (capex_usd truthy) count here;
+    # a project with no CAPEX need at all isn't "unfunded", it just doesn't belong in this metric.
+    # Same still-active scope as the CAPEX-funded % heading above. ---
+    capex_need_rows = [r for r in still_active_rows if r["capex_usd"]]
+    fully_funded = sum(1 for r in capex_need_rows if (r["capex_funded_pct"] or 0) >= 100)
+    unfunded = sum(1 for r in capex_need_rows if not r["capex_funded_pct"])
+    partially_funded = len(capex_need_rows) - fully_funded - unfunded
 
     risk_counts = {"green": 0, "yellow": 0, "red": 0, "in_review": 0}
     for r in still_active_rows:
@@ -273,83 +310,35 @@ def render():
         _bar_row("Approved / in progress", len(approved_rows), total_projects, "#5fd07a")
         + _bar_row("Pending review", len(pending_rows), total_projects, "#e8b34d")
         + _bar_row("Cancelled", len(cancelled_rows), total_projects, "#8fa3c7")
-        + _bar_row("Rejected — duplicate", len(dup_rejected), total_projects, "#e0894f")
-        + _bar_row("Rejected — other", len(other_rejected), total_projects, "#e2574f")
+        + _bar_row("Rejected", len(rejected_rows), total_projects, "#e2574f")
     )
-    alignment_bars = (
-        _bar_row("Aligned", alignment_counts["aligned"], total_projects, "#5fd07a")
-        + _bar_row("Partially aligned", alignment_counts["partially_aligned"], total_projects, "#e8b34d")
-        + _bar_row("Misaligned", alignment_counts["misaligned"], total_projects, "#e2574f")
-        + _bar_row("Agent 6 inconclusive", alignment_counts["inconclusive"], total_projects, "#8fa3c7")
-        + _bar_row("Not yet assessed", alignment_counts["unassessed"], total_projects, "#3d4f78")
+    coverage_bars = (
+        _bar_row("Aligned", coverage_aligned, total_projects, "#5fd07a")
+        + _bar_row("Orphaned", coverage_orphaned, total_projects, "#e2574f")
     )
+    capex_coverage_bars = (
+        _bar_row("Fully funded", fully_funded, len(capex_need_rows), "#5fd07a")
+        + _bar_row("Partially funded", partially_funded, len(capex_need_rows), "#e8b34d")
+        + _bar_row("Unfunded", unfunded, len(capex_need_rows), "#e2574f")
+    ) if capex_need_rows else '<div style="font-size:12px;color:#93a8d0">No active projects currently need CAPEX.</div>'
+    health_bars = (
+        _bar_row("High (≥70)", health_counts["high"], total_projects, "#5fd07a")
+        + _bar_row("Medium (40–69)", health_counts["medium"], total_projects, "#e8b34d")
+        + _bar_row("Low (<40)", health_counts["low"], total_projects, "#e2574f")
+        + _bar_row("Under monitoring", health_counts["under_monitoring"], total_projects, "#8fa3c7")
+        + _bar_row("Not yet tracked", health_counts["not_tracked"], total_projects, "#3d4f78")
+    )
+    _BU_COLORS = ["#5fd07a", "#378ADD", "#e8b34d", "#e2574f", "#8fa3c7", "#c77dd1", "#3d4f78", "#e0894f"]
+    bu_bars = "".join(
+        _bar_row_usd(bu, val, portfolio_value, _BU_COLORS[i % len(_BU_COLORS)])
+        for i, (bu, val) in enumerate(bu_ranked)
+    ) if bu_ranked else '<div style="font-size:12px;color:#93a8d0">No active portfolio value yet.</div>'
 
     sortable_cols = ["Project", "Size of price", "Risk", "Schedule", "Resource", "CAPEX funded", "Score"]
     header_html = "".join(
         f'<th class="sortable" data-col="{i}">{label}<span class="arrow"></span></th>'
         for i, label in enumerate(sortable_cols)
     )
-
-    # "The list is an interactive database" — pick any accepted/in_progress project and send it a
-    # real update email (scripts/demo_engine.py's submit_project_update_freeform(), parsed by
-    # src/agents/agent11_update_logger.py's parse_update_email()). Only projects a real update can
-    # legitimately apply to are offered — draft/pmo_review/analysis rows haven't been accepted yet,
-    # and completed/cancelled/rejected ones are already terminal (schemas.py's ALLOWED_TRANSITIONS).
-    updatable_rows = [r for r in rows if r["status"] in ("accepted", "in_progress")]
-    update_options = "".join(
-        f'<option value="{html_lib.escape(r["project_id"] or r["submission_id"])}" '
-        f'data-name="{html_lib.escape(r["project_name"] or "")}" '
-        f'data-submitter="{html_lib.escape(r["submitter_name"] or "")}">'
-        f'{html_lib.escape(r["project_name"] or "")} ({html_lib.escape(r["project_id"] or r["submission_id"])})</option>'
-        for r in updatable_rows
-    )
-    # Ghost-text body editor: parse UPDATE_BODY_PLACEHOLDER (agent11_update_logger.py's single source
-    # of truth for the labeled-line update format, also what parse_update_email() matches) into
-    # (label, hint) pairs. The label before each colon renders as real, fixed text
-    # (contenteditable="false") — it's always there and can't be deleted by accident — while only the
-    # hint after it is greyed-out ghost text: click it and it clears immediately so you can type the
-    # value straight in, no need to remember or retype the field name.
-    _ghost_line_re = re.compile(r"^(?P<label>.+?:\s*\$?)<(?P<hint>.+)>$")
-    ghost_lines = [
-        m.groupdict()
-        for m in (_ghost_line_re.match(ln) for ln in UPDATE_BODY_PLACEHOLDER.splitlines() if ln.strip())
-        if m
-    ]
-    field_lines, note_line = ghost_lines[:-1], ghost_lines[-1]
-
-    def _ghost_row(label, hint, extra_class=""):
-        return (
-            f'<div class="uline{extra_class}">'
-            f'<span class="lbl" contenteditable="false">{html_lib.escape(label)}</span>'
-            f'<span class="ghost" data-hint="{html_lib.escape(hint)}">{html_lib.escape(hint)}</span>'
-            f'</div>'
-        )
-
-    body_editor_html = "".join(_ghost_row(l["label"], l["hint"]) for l in field_lines) + \
-        _ghost_row(note_line["label"], note_line["hint"], " note-row")
-
-    update_compose_html = f"""<h3 class="section-h">Send a project update</h3>
-<div id="update-compose">
-{'<div class="empty">No accepted or in-progress projects to update right now.</div>' if not updatable_rows else f'''
-<form method="POST" action="/project-update/submit" id="u-form">
-  <label for="u-project">Project</label>
-  <select id="u-project" name="project_ref" required>{update_options}</select>
-  <label for="u-from">From</label>
-  <input id="u-from" name="from" type="text" required>
-  <label for="u-subject">Subject</label>
-  <input id="u-subject" name="subject" type="text" required>
-  <label for="u-body">Body</label>
-  <div id="u-body-editable" class="body-editable" contenteditable="true" spellcheck="false">{body_editor_html}</div>
-  <textarea id="u-body" name="body" style="display:none"></textarea>
-  <div class="runbar"><button type="submit">✉ Submit update</button></div>
-</form>
-<div class="sub">Click any greyed-out hint to fill it in — the label stays put, only the hint clears.
-Leave a hint untouched to skip that field. Runs through the real pipeline — Agent 11 captures
-whatever's typed (deterministic parser, same labeled-line shape shown here), Agent 12 evaluates it
-and either applies it directly or opens a real Manual Gate 3 for PMO to accept, decline, or cancel
-the project.</div>
-'''}
-</div>"""
 
     html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>PMO Topline Dashboard</title><style>{CSS}</style></head>
 <body>
@@ -365,7 +354,10 @@ the project.</div>
 
 <div class="distros">
 <div class="distro"><h4>Status Distribution</h4>{status_bars}</div>
-<div class="distro"><h4>Strategic Alignment Distribution</h4>{alignment_bars}</div>
+<div class="distro"><h4>Strategic Coverage (Aligned vs Orphaned)</h4>{coverage_bars}</div>
+<div class="distro"><h4>CAPEX Funding Coverage</h4>{capex_coverage_bars}</div>
+<div class="distro"><h4>Predictive Portfolio Health</h4>{health_bars}</div>
+<div class="distro"><h4>Portfolio Value by Business Unit</h4>{bu_bars}</div>
 </div>
 
 <div class="riskmix">
@@ -384,8 +376,6 @@ the project.</div>
 <table id="ptable"><thead><tr>{header_html}</tr></thead><tbody>
 {table_rows}
 </tbody></table>
-
-{update_compose_html}
 
 <script>
 (function() {{
@@ -411,92 +401,6 @@ the project.</div>
       rows.forEach(function(r) {{ tbody.appendChild(r); }});
     }});
   }});
-}})();
-
-// Prefill From/Subject from the picked project's real data (submitter_name, project_name) — never
-// fabricated, just what's already on the row — and re-fill whenever the selection changes.
-(function() {{
-  var select = document.getElementById('u-project');
-  if (!select) return;
-  function fillFromSelection() {{
-    var opt = select.options[select.selectedIndex];
-    if (!opt) return;
-    var name = opt.dataset.submitter || 'Project team';
-    document.getElementById('u-from').value = name + ' <' + name.toLowerCase().replace(/[^a-z]+/g, '.') + '@company.com>';
-    document.getElementById('u-subject').value = 'Update: ' + (opt.dataset.name || '');
-  }}
-  select.addEventListener('change', fillFromSelection);
-  fillFromSelection();
-}})();
-
-// Ghost-text body editor: each field's label span is contenteditable="false" (real, fixed text,
-// can't be typed over or deleted) and its value span starts as gray "ghost" hint text. Clicking
-// anywhere on the row clears the hint and lets you type the real value; leaving it empty restores
-// the hint. Right before submit, only the rows actually filled in get assembled into the hidden
-// textarea, in the exact "Label: value" per-line shape parse_update_email() expects — so untouched
-// hints are correctly treated as "unchanged", not submitted as literal text.
-(function() {{
-  var editable = document.getElementById('u-body-editable');
-  if (!editable) return;
-  var hidden = document.getElementById('u-body');
-  var form = document.getElementById('u-form');
-  var lastActive = null;
-
-  function placeCaretInside(span) {{
-    var range = document.createRange();
-    range.selectNodeContents(span);
-    range.collapse(true);
-    var sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }}
-  function restoreIfEmpty(span) {{
-    if (span && span.classList.contains('filled') && span.textContent.trim() === '') {{
-      span.classList.remove('filled');
-      span.classList.add('ghost');
-      span.textContent = span.dataset.hint;
-    }}
-  }}
-  function activate(span) {{
-    if (lastActive && lastActive !== span) restoreIfEmpty(lastActive);
-    if (span.classList.contains('ghost')) {{
-      span.classList.remove('ghost');
-      span.classList.add('filled');
-      span.textContent = '';
-    }}
-    placeCaretInside(span);
-    lastActive = span;
-  }}
-  Array.prototype.forEach.call(editable.querySelectorAll('.uline'), function(row) {{
-    row.addEventListener('mousedown', function(e) {{
-      e.preventDefault();
-      editable.focus();
-      activate(row.querySelector('.ghost, .filled'));
-    }});
-  }});
-  editable.addEventListener('blur', function() {{ restoreIfEmpty(lastActive); }});
-
-  if (form) {{
-    form.addEventListener('submit', function(e) {{
-      restoreIfEmpty(lastActive);
-      var lines = [];
-      Array.prototype.forEach.call(editable.querySelectorAll('.uline:not(.note-row)'), function(row) {{
-        var val = row.querySelector('.filled');
-        if (val) lines.push(row.querySelector('.lbl').textContent + val.textContent.trim());
-      }});
-      var noteRow = editable.querySelector('.uline.note-row');
-      var noteVal = noteRow && noteRow.querySelector('.filled');
-      var body = lines.join('\\n');
-      if (noteVal) {{
-        body += (lines.length ? '\\n\\n' : '') + noteRow.querySelector('.lbl').textContent + noteVal.textContent.trim();
-      }}
-      hidden.value = body;
-      if (!body.trim()) {{
-        e.preventDefault();
-        alert('Click a hint and fill in at least one field or a note before submitting.');
-      }}
-    }});
-  }}
 }})();
 
 // Case 8/9 (§7.2 change management) never run through the Live Execution Visualizer, which is

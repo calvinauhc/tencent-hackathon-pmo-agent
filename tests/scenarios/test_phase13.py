@@ -125,34 +125,74 @@ result_no_fields = demo_engine.submit_project_update_freeform(target_ref, "x", "
 check("13.4 an email with no recognizable fields is rejected, not silently accepted as a no-op",
       "error" in result_no_fields, result_no_fields)
 
-# --- 13.5 the topline compose panel and revert button render correctly ---
+# --- 13.5 the update-compose panel lives in the composer's LEFT panel (moved off topline.html,
+# below "or submit your own"), with a real ghost-text body editor — not on the dashboard anymore. ---
 demo_engine.render_topline()
 topline_path = os.path.join(os.path.dirname(__file__), "..", "..", "dashboard", "topline.html")
 with open(topline_path) as f:
     topline_html = f.read()
-check("13.5 topline has the update-compose panel", 'id="update-compose"' in topline_html)
-check("13.5 topline's update panel posts to the real route", 'action="/project-update/submit"' in topline_html)
-check("13.5 topline only offers accepted/in_progress projects, not draft/rejected/cancelled ones",
-      "cancelled</option" not in topline_html and draft_ref not in topline_html.split('id="update-compose"')[1].split("</select>")[0])
+check("13.5 topline no longer renders the update-compose panel (moved to the composer)",
+      'id="update-compose"' not in topline_html)
 
 landing = demo_server.render_landing()
+check("13.5 the composer's left panel has the update-compose panel", 'id="update-compose"' in landing)
+check("13.5 the update panel posts to the real route, targeting the middle panel",
+      'action="/project-update/submit"' in landing and 'target="middle-frame"' in landing and 'id="u-form"' in landing)
+check("13.5 the update panel only offers accepted/in_progress projects, not draft/rejected/cancelled ones",
+      "cancelled</option" not in landing and draft_ref not in landing.split('id="update-compose"')[1].split("</select>")[0])
+check("13.5 the update panel's body uses the ghost-text editor (fixed label + greyed-out hint)",
+      'id="u-body-editable"' in landing and 'class="lbl" contenteditable="false"' in landing)
+check("13.5 the intake 'or submit your own' box also uses the ghost-text editor",
+      'id="c-body-editable"' in landing and 'id="c-form"' in landing)
+
 check("13.6 the composer's right panel has a Revert back button", 'id="revert-btn"' in landing and "Revert back" in landing)
 check("13.6 the revert button posts to the real /reset route, targeting the whole page", 'action="/reset"' in landing and 'target="_top"' in landing)
 
-# --- 13.7 reset_demo() wipes and reseeds cleanly ---
+# --- 13.7 both ghost-text editors' assembled-text format (only "filled" rows join as "Label: value"
+# lines, in order) round-trips correctly through the real parsers they're built against ---
+from src.agents.agent1_intake_parser import _deterministic_fallback_parse
+
+freeform_body = (
+    "Objective: Manual invoice reconciliation takes 3 days a month\n"
+    "Proposed solution: Automated matching against bank feed\n"
+    "Estimated business impact: $220,000\n"
+    "Estimated CAPEX: $45,000\n"
+    "Risk: Vendor data format may vary by region\n"
+    "Team: Grace Lim, Wei Ling Tan"
+)
+freeform_parsed = _deterministic_fallback_parse(
+    f"From: Grace Lim <grace@company.com>\nSubject: Proposal: Invoice automation\n\n{freeform_body}"
+)
+check("13.7 ghost-editor-assembled freeform body parses all 6 fields correctly",
+      freeform_parsed["objective"] == "Manual invoice reconciliation takes 3 days a month"
+      and freeform_parsed["solution"] == "Automated matching against bank feed"
+      and freeform_parsed["business_impact_usd"] == 220000.0
+      and freeform_parsed["capex_usd"] == 45000.0
+      and freeform_parsed["hypothesis_risk"] == "Vendor data format may vary by region"
+      and freeform_parsed["team_members"] == ["Grace Lim", "Wei Ling Tan"],
+      freeform_parsed)
+
+ghost_update_body = "New launch date: 2027-01-01\n\nNote: Pulling the date in, ahead of schedule."
+ghost_fields, ghost_note = parse_update_email(ghost_update_body)
+check("13.7 ghost-editor-assembled update body (only 1 of 6 rows filled) parses correctly",
+      ghost_fields == {"expected_launch_date": "2027-01-01"}
+      and ghost_note == "Pulling the date in, ahead of schedule.",
+      (ghost_fields, ghost_note))
+
+# --- 13.8 reset_demo() wipes and reseeds cleanly ---
 # Leave a stale artifact + a cancelled project in place, then confirm reset clears both.
 stale_path = os.path.join(os.path.dirname(__file__), "..", "..", "dashboard", "visualizer_STALE-TEST.html")
 with open(stale_path, "w") as f:
     f.write("<html>stale</html>")
 reset_result = demo_engine.reset_demo()
-check("13.7 reset_demo() reseeds exactly the 20 curated trial projects", reset_result["projects_reseeded"] == 20, reset_result)
+check("13.8 reset_demo() reseeds exactly the 20 curated trial projects", reset_result["projects_reseeded"] == 20, reset_result)
 conn2 = get_connection()
 count_after = conn2.execute("SELECT COUNT(*) c FROM projects").fetchone()["c"]
 statuses_after = {r["status"] for r in conn2.execute("SELECT status FROM projects").fetchall()}
-check("13.7 the DB actually has 20 fresh rows post-reset", count_after == 20, count_after)
-check("13.7 no cancelled projects survive a reset — back to the pristine seed", "cancelled" not in statuses_after, statuses_after)
-check("13.7 the stale visualizer artifact was deleted", not os.path.isfile(stale_path))
-check("13.7 topline.html was regenerated fresh", os.path.isfile(topline_path))
+check("13.8 the DB actually has 20 fresh rows post-reset", count_after == 20, count_after)
+check("13.8 no cancelled projects survive a reset — back to the pristine seed", "cancelled" not in statuses_after, statuses_after)
+check("13.8 the stale visualizer artifact was deleted", not os.path.isfile(stale_path))
+check("13.8 topline.html was regenerated fresh", os.path.isfile(topline_path))
 
 print()
 passed = sum(1 for _, s in results if s == "PASS")
