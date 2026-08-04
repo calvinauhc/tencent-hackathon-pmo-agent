@@ -29,7 +29,7 @@ straight through with no decision step at all.
 Usage:  python3 scripts/demo_server.py            (serves on http://127.0.0.1:8765)
 Local-only by design (binds 127.0.0.1) — this is a demo tool for your own machine, not a deployment.
 """
-import sys, os, html, json, urllib.parse
+import sys, os, re, html, json, urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -38,7 +38,7 @@ from demo_engine import (
     submit_project_update, resolve_gate3_decision, CHANGE_DEMO_PAYLOADS, CHANGE_CASE_EMAILS,
     complete_project, run_batch_case, review_queued_project, override_queued_project, open_batch,
     close_batch, render_gate2_queue, submit_freeform, FREEFORM_BODY_PLACEHOLDER,
-    submit_project_update_freeform, reset_demo,
+    submit_project_update_freeform, reset_demo, get_updatable_projects, UPDATE_BODY_PLACEHOLDER,
 )
 # Note: run_batch_case/review_queued_project/override_queued_project/open_batch/close_batch and
 # their /batch/, /queue/* HTTP routes below are kept fully wired even though the "Periodic Gate 2
@@ -111,11 +111,55 @@ button:hover{background:#2c6fb3}
 .divider{display:flex;align-items:center;gap:10px;margin:20px 0 14px}
 .divider .line{flex:1;height:1px;background:#e5e3dc}
 .divider span{font-size:11px;color:#999}
-#compose{border:1px solid #e5e3dc;border-radius:10px;padding:10px 12px;background:#fff}
-#compose label{font-size:11px;color:#5f5e5a;display:block;margin-bottom:3px}
-#compose input,#compose textarea{width:100%;font-size:12px;font-family:inherit;padding:6px 8px;border:1px solid #e5e3dc;border-radius:6px;margin-bottom:10px;box-sizing:border-box}
+#compose,#update-compose{border:1px solid #e5e3dc;border-radius:10px;padding:10px 12px;background:#fff}
+#compose label,#update-compose label{font-size:11px;color:#5f5e5a;display:block;margin-bottom:3px}
+#compose input,#compose textarea,#compose select,#update-compose input,#update-compose textarea,#update-compose select{width:100%;font-size:12px;font-family:inherit;padding:6px 8px;border:1px solid #e5e3dc;border-radius:6px;margin-bottom:10px;box-sizing:border-box}
 #compose textarea{height:120px;resize:vertical}
+#update-compose .empty{color:#888;font-size:12px;padding:6px 2px}
+/* Ghost-text body editor (shared by both compose boxes): the label before each colon is real, fixed
+   text (contenteditable="false") — always there, can't be typed over or deleted — while the hint
+   after it is greyed-out ghost text that clears the instant you click into the row, so you can type
+   the value straight in without re-typing or remembering the field name. */
+.body-editable{width:100%;font-size:12px;font-family:inherit;padding:8px;border:1px solid #e5e3dc;border-radius:6px;box-sizing:border-box;min-height:110px;line-height:1.8;cursor:text;margin-bottom:10px}
+.body-editable:focus{outline:2px solid #d8d4c8;outline-offset:1px}
+.uline{white-space:pre-wrap}
+.uline.note-row,.uline.spaced{margin-top:10px}
+.uline .lbl{color:#2a2a28}
+.uline .ghost{color:#a8a49a}
+.uline .filled{color:#2a2a28}
 """
+
+# Ghost-text body editor (shared by "or submit your own" and "or send a project update"): parses a
+# placeholder string's "Label: <hint>" lines into (real fixed label, greyed-out hint) row HTML. Built
+# from FREEFORM_BODY_PLACEHOLDER / UPDATE_BODY_PLACEHOLDER themselves (both from demo_engine.py,
+# ultimately from src/agents/agent1_intake_parser.py and agent11_update_logger.py) rather than
+# hand-duplicated label text, so the on-screen hint and the parser it documents can never drift
+# apart. Blank lines in the placeholder become spacing between rows (a "spaced" class), not literal
+# blank rows — this renders as a block-level DIV layout, not a raw textarea character stream.
+_GHOST_LINE_RE = re.compile(r"^(?P<label>.+?:\s*\$?)<(?P<hint>.+)>$")
+
+
+def _ghost_editor_rows(placeholder_text):
+    rows_html = []
+    first_in_group = True
+    for raw_line in placeholder_text.splitlines():
+        if not raw_line.strip():
+            first_in_group = True
+            continue
+        m = _GHOST_LINE_RE.match(raw_line)
+        if not m:
+            continue
+        label, hint = m.group("label"), m.group("hint")
+        cls = " spaced" if (rows_html and first_in_group) else ""
+        rows_html.append(
+            f'<div class="uline{cls}">'
+            f'<span class="lbl" contenteditable="false">{html.escape(label)}</span>'
+            f'<span class="ghost" data-hint="{html.escape(hint)}">{html.escape(hint)}</span>'
+            f'</div>'
+        )
+        first_in_group = False
+    return "".join(rows_html)
+
 
 def render_landing():
     options = []
@@ -202,22 +246,66 @@ def render_landing():
     compose_section = f"""
 <div class="divider"><div class="line"></div><span>or submit your own</span><div class="line"></div></div>
 <div id="compose">
-  <form method="POST" action="/submit" target="middle-frame">
+  <form method="POST" action="/submit" target="middle-frame" id="c-form">
     <label for="c-from">From</label>
     <input id="c-from" name="from" type="text" placeholder="name@company.com" />
     <label for="c-subject">Subject</label>
     <input id="c-subject" name="subject" type="text" placeholder="Proposal — project name" />
     <label for="c-body">Body</label>
-    <textarea id="c-body" name="body" placeholder="{html.escape(FREEFORM_BODY_PLACEHOLDER)}"></textarea>
+    <div id="c-body-editable" class="body-editable" contenteditable="true" spellcheck="false">{_ghost_editor_rows(FREEFORM_BODY_PLACEHOLDER)}</div>
+    <textarea id="c-body" name="body" style="display:none"></textarea>
     <div class="runbar" style="padding:0;border-top:none">
       <button type="submit">✉ Submit for review</button>
     </div>
   </form>
 </div>
-<div class="sub" style="margin-top:8px">Runs through the real pipeline — Agent 1 parses whatever's
-typed (deterministic fallback in demo mode, so it works best matching the placeholder's shape), Agent
-2 checks it against the real seeded trial projects for duplicates. Agent 5/6 use one generic mock
+<div class="sub" style="margin-top:8px">Click any greyed-out hint to fill it in — the label stays
+put, only the hint clears. Runs through the real pipeline — Agent 1 parses whatever's typed
+(deterministic fallback in demo mode, so it works best matching the placeholder's shape), Agent 2
+checks it against the real seeded trial projects for duplicates. Agent 5/6 use one generic mock
 response in demo mode (no ANTHROPIC_API_KEY); set that env var and they judge it for real too.</div>"""
+
+    # "The list is an interactive database" — pick any accepted/in_progress project (real, live DB
+    # state via get_updatable_projects(), not the trial-data snapshot) and send it a real update
+    # email, parsed by Agent 11's own deterministic parser (src/agents/agent11_update_logger.py's
+    # parse_update_email()). Moved here from dashboard/render_topline.py's middle-panel dashboard —
+    # this is the left panel's other real entry point now, right below "or submit your own", not a
+    # dashboard widget. target="middle-frame" so the result (auto-applied -> topline, or escalated ->
+    # a real Manual Gate 3) shows in the middle panel exactly like every other left-panel action, and
+    # notifications still surface in the right panel via the same _redirect_with_notification() relay
+    # Case 8/9 use (see topline.html's own script for the receiving half of that relay).
+    updatable_rows = get_updatable_projects()
+    update_options = "".join(
+        f'<option value="{html.escape(r["project_id"] or r["submission_id"])}" '
+        f'data-name="{html.escape(r["project_name"] or "")}" '
+        f'data-submitter="{html.escape(r["submitter_name"] or "")}">'
+        f'{html.escape(r["project_name"] or "")} ({html.escape(r["project_id"] or r["submission_id"])})</option>'
+        for r in updatable_rows
+    )
+    update_section = f"""
+<div class="divider"><div class="line"></div><span>or send a project update</span><div class="line"></div></div>
+<div id="update-compose">
+{'<div class="empty">No accepted or in-progress projects to update right now.</div>' if not updatable_rows else f'''
+<form method="POST" action="/project-update/submit" target="middle-frame" id="u-form">
+  <label for="u-project">Project</label>
+  <select id="u-project" name="project_ref" required>{update_options}</select>
+  <label for="u-from">From</label>
+  <input id="u-from" name="from" type="text" required>
+  <label for="u-subject">Subject</label>
+  <input id="u-subject" name="subject" type="text" required>
+  <label for="u-body">Body</label>
+  <div id="u-body-editable" class="body-editable" contenteditable="true" spellcheck="false">{_ghost_editor_rows(UPDATE_BODY_PLACEHOLDER)}</div>
+  <textarea id="u-body" name="body" style="display:none"></textarea>
+  <div class="runbar" style="padding:0;border-top:none">
+    <button type="submit">✉ Submit update</button>
+  </div>
+</form>
+<div class="sub" style="margin-top:8px">Click any greyed-out hint to fill it in — the label stays
+put, only the hint clears. Leave a hint untouched to skip that field. Runs through the real pipeline
+— Agent 11 captures whatever's typed, Agent 12 evaluates it and either applies it directly or opens a
+real Manual Gate 3 for PMO to accept, decline, or cancel the project.</div>
+'''}
+</div>"""
 
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>PMO Intake — Composer</title>
 <style>{PAGE_CSS}</style></head><body>
@@ -231,6 +319,7 @@ response in demo mode (no ANTHROPIC_API_KEY); set that env var and they judge it
     <select id="action-select">{"".join(options)}</select>
     {"".join(panels)}
     {compose_section}
+    {update_section}
   </div>
   <div class="resizer" id="resize-left" title="Drag to resize"></div>
   <div id="middle">
@@ -290,6 +379,88 @@ window.addEventListener('message', function(e) {{
   }}
 }});
 document.getElementById('middle-frame').addEventListener('load', function() {{ clearFeed(); clearDecision(); }});
+
+// Ghost-text body editor (shared by both compose boxes below the case dropdown): each row's label
+// span is contenteditable="false" (real, fixed text, can't be typed over or deleted) and its value
+// span starts as grey "ghost" hint text. Clicking anywhere on the row clears the hint and lets you
+// type the real value; leaving it empty restores the hint. Right before submit, only rows actually
+// filled in get assembled into the hidden textarea, one "Label: value" per line, in document order —
+// untouched hints are correctly treated as "not stated", never submitted as literal placeholder text.
+function initGhostEditor(editorId, hiddenId, formId) {{
+  var editable = document.getElementById(editorId);
+  if (!editable) return;
+  var hidden = document.getElementById(hiddenId);
+  var form = document.getElementById(formId);
+  var lastActive = null;
+
+  function placeCaretInside(span) {{
+    var range = document.createRange();
+    range.selectNodeContents(span);
+    range.collapse(true);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }}
+  function restoreIfEmpty(span) {{
+    if (span && span.classList.contains('filled') && span.textContent.trim() === '') {{
+      span.classList.remove('filled');
+      span.classList.add('ghost');
+      span.textContent = span.dataset.hint;
+    }}
+  }}
+  function activate(span) {{
+    if (lastActive && lastActive !== span) restoreIfEmpty(lastActive);
+    if (span.classList.contains('ghost')) {{
+      span.classList.remove('ghost');
+      span.classList.add('filled');
+      span.textContent = '';
+    }}
+    placeCaretInside(span);
+    lastActive = span;
+  }}
+  Array.prototype.forEach.call(editable.querySelectorAll('.uline'), function(row) {{
+    row.addEventListener('mousedown', function(e) {{
+      e.preventDefault();
+      editable.focus();
+      activate(row.querySelector('.ghost, .filled'));
+    }});
+  }});
+  editable.addEventListener('blur', function() {{ restoreIfEmpty(lastActive); }});
+
+  if (form) {{
+    form.addEventListener('submit', function(e) {{
+      restoreIfEmpty(lastActive);
+      var lines = [];
+      Array.prototype.forEach.call(editable.querySelectorAll('.uline'), function(row) {{
+        var val = row.querySelector('.filled');
+        if (val) lines.push(row.querySelector('.lbl').textContent + val.textContent.trim());
+      }});
+      hidden.value = lines.join('\\n');
+      if (!hidden.value.trim()) {{
+        e.preventDefault();
+        alert('Click a hint and fill in at least one field before submitting.');
+      }}
+    }});
+  }}
+}}
+initGhostEditor('c-body-editable', 'c-body', 'c-form');
+initGhostEditor('u-body-editable', 'u-body', 'u-form');
+
+// Prefill From/Subject on the update box from the picked project's real data (submitter_name,
+// project_name) — never fabricated, just what's already on the row — and re-fill on selection change.
+(function() {{
+  var select = document.getElementById('u-project');
+  if (!select) return;
+  function fillFromSelection() {{
+    var opt = select.options[select.selectedIndex];
+    if (!opt) return;
+    var name = opt.dataset.submitter || 'Project team';
+    document.getElementById('u-from').value = name + ' <' + name.toLowerCase().replace(/[^a-z]+/g, '.') + '@company.com>';
+    document.getElementById('u-subject').value = 'Update: ' + (opt.dataset.name || '');
+  }}
+  select.addEventListener('change', fillFromSelection);
+  fillFromSelection();
+}})();
 
 // Draggable panel resizing — left/right panels remember their width in localStorage (this is a
 // real local page in a real browser, not a sandboxed artifact preview, so persisting the layout
@@ -456,11 +627,11 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if parsed.path == "/project-update/submit":
-            # "The list is an interactive database" — topline.html's own compose panel (dashboard/
-            # render_topline.py), a real update against whichever accepted/in_progress project was
-            # picked. Normal form POST + redirect, same as /change/ — this form has no target=, so
-            # it's submitted from and returns straight to topline.html's own iframe (#middle-frame),
-            # not routed through the left panel at all.
+            # "The list is an interactive database" — the left panel's "or send a project update" box
+            # (render_landing()'s update_section, moved here from dashboard/render_topline.py's
+            # middle-panel dashboard), a real update against whichever accepted/in_progress project
+            # was picked. Normal form POST + redirect, same as /change/ — target="middle-frame" so the
+            # result lands in the middle panel's iframe exactly like every other left-panel action.
             form = self._read_form_body()
             result = submit_project_update_freeform(
                 form.get("project_ref", ""), form.get("from", ""), form.get("subject", ""), form.get("body", ""),

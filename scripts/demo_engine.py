@@ -433,6 +433,20 @@ def submit_project_update(project_ref, kind):
 # actual parser (src/agents/agent11_update_logger.py's parse_update_email(), the same deterministic-
 # fallback convention as Agent 1's own parse_intake()/_deterministic_fallback_parse() — never guesses
 # a field that isn't actually stated) then Agent 12 exactly as Case 8/9 already do.
+def get_updatable_projects():
+    """Every project the "Send a project update" panel can legitimately target right now — real,
+    live DB state, not the trial-data snapshot. Was topline.html's own query (dashboard/
+    render_topline.py) before that panel moved into the composer's left panel (scripts/
+    demo_server.py); this is the one place both callers get the same accepted/in_progress rows
+    from. draft/pmo_review/analysis rows haven't been accepted yet, and completed/cancelled/rejected
+    ones are already terminal (schemas.py's ALLOWED_TRANSITIONS) — same filter render_topline.py
+    used to apply directly."""
+    conn = get_connection()
+    return [dict(r) for r in conn.execute(
+        "SELECT * FROM projects WHERE status IN ('accepted', 'in_progress') ORDER BY updated_at DESC"
+    ).fetchall()]
+
+
 def submit_project_update_freeform(project_ref, from_field, subject, body):
     """Runs a real, typed update email through Agent 11 (parse + capture) then Agent 12 (evaluate +
     apply-or-escalate), against whichever accepted/in_progress project was actually picked — not a
@@ -775,12 +789,21 @@ FREEFORM_MOCKS = {
     "agent6": {"verdict": "aligned", "citation": "AI-enabled operational tooling, supply chain digitization, customer-facing automation"},
 }
 
+# One "Label: <hint>" per line — reshaped from an earlier version that packed two fields onto one
+# line ("Estimated business impact: $<amount>. Estimated CAPEX: $<amount>.") and tacked an unparsed
+# "— <department>, <region>" suffix onto the Team line. _deterministic_fallback_parse()'s regexes
+# (src/agents/agent1_intake_parser.py) never actually used that suffix — team_match already discards
+# everything after the em-dash — and its impact_match/capex_match searches aren't line-bound, so
+# splitting the combined line changes nothing about what gets parsed. Reshaped so the composer's
+# ghost-text body editor (same pattern as the "Send a project update" panel) can render one real
+# label + one greyed-out hint per row, consistently.
 FREEFORM_BODY_PLACEHOLDER = (
     "Objective: <the problem, one sentence>\n"
     "Proposed solution: <what you're proposing>\n\n"
-    "Estimated business impact: $<amount>. Estimated CAPEX: $<amount>.\n"
+    "Estimated business impact: $<amount>\n"
+    "Estimated CAPEX: $<amount>\n"
     "Risk: <biggest known risk, or \"No significant risk identified at this stage\">\n\n"
-    "Team: <names> — <department>, <region>."
+    "Team: <names, comma-separated>"
 )
 
 def submit_freeform(from_field, subject, body):

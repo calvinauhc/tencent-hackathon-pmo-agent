@@ -77,7 +77,12 @@ check("12.5 the agent6 mock verdict is a real, valid verdict value", demo_engine
 # (dashboard/render_topline.py's embedded queue), not a dropdown panel here anymore. ---
 import demo_server
 landing = demo_server.render_landing()
-check("12.6 the dropdown has exactly 10 options (7 cases + case 8/9/10)", landing.count("<option") == 10, landing.count("<option"))
+# Scoped to #action-select specifically — landing.count("<option") over the WHOLE page would also
+# count the "or send a project update" box's own per-project <option> tags (Phase 13's ghost-text
+# panel, scripts/demo_server.py's update_section), which is a separate <select> entirely.
+action_select_html = landing.split('id="action-select"')[1].split("</select>")[0]
+check("12.6 the dropdown has exactly 10 options (7 cases + case 8/9/10)",
+      action_select_html.count("<option") == 10, action_select_html.count("<option"))
 check("12.6 every option has a matching action-panel div", landing.count('class="action-panel') == 10, landing.count('class="action-panel'))
 check("12.6 the batch/Periodic Gate 2 Review dropdown entry is gone", "Periodic Gate 2 Review" not in landing, None)
 check("12.6 the compose box posts to the real /submit route", 'action="/submit"' in landing, '/submit' in landing)

@@ -22,7 +22,7 @@ No API key is required to run or test this build — it runs in mock mode automa
 ./run_all_tests.sh
 ```
 
-Runs all 13 phase test files in order (`tests/scenarios/`, `tests/eval/`) and prints pass/fail counts. 234 checks total, covering agents, the state machine (including the `cancelled` status), guardrails, the full pipeline across all 10 named scenarios (7 original + 3 batch-queue cases), the post-acceptance change-management/OPL loop (including Gate 3's Cancel decision), the periodic Gate 2 review queue (now embedded on the topline dashboard), the dashboard/visualizer/comment panel, the topline's metric cards/distribution panels/sortable table, the composer's freeform "compose your own" submission path, and the topline's own interactive "send a project update" panel + the Revert back reset. To run one phase at a time:
+Runs all 13 phase test files in order (`tests/scenarios/`, `tests/eval/`) and prints pass/fail counts. 239 checks total, covering agents, the state machine (including the `cancelled` status), guardrails, the full pipeline across all 10 named scenarios (7 original + 3 batch-queue cases), the post-acceptance change-management/OPL loop (including Gate 3's Cancel decision), the periodic Gate 2 review queue (now embedded on the topline dashboard), the dashboard/visualizer/comment panel, the topline's metric cards/five real distribution panels/sortable table, and the composer's two ghost-text compose boxes — freeform "compose your own" submission plus the interactive "send a project update" panel (moved from the dashboard) — and the Revert back reset. To run one phase at a time:
 
 ```
 python3 tests/scenarios/test_phase1.py
@@ -52,20 +52,31 @@ trial data, phrased the way a submitter would write it) plus Case 8/9/10 — pos
 management (Agents 11/12, one action per case: favorable auto-apply, unfavorable → Gate 3) and
 project completion (Agent 13's OPL). Picking one shows its preview and a "Run this case" button;
 clicking it sends that submission through the real agent pipeline live, then drops you straight onto
-the execution visualizer for the result. Below the dropdown, a "compose your own" box
-(From/Subject/Body) runs genuinely typed text through the same real pipeline via Agent 1's actual
-parser — see "Mock mode" below for what's genuinely live versus mocked in that path. The portfolio
-dashboard (`dashboard/topline.html`) embeds §5.3's Periodic Gate 2 Review queue directly — Open/Close
-batch and Review/Override are real buttons there now, not a separate composer entry. The topline
-table itself is interactive too: a "Send a project update" panel at the bottom lets you pick any real
-accepted/in_progress project and submit a typed update email (new launch date/CAPEX/risk/schedule/
-resource + a note) through Agent 11's real parser and Agent 12's real evaluation — favorable changes
-apply immediately, unfavorable ones open a real Manual Gate 3, where PMO can Accept, Decline, or
-**Cancel the project entirely** (a distinct `cancelled` status, separate from `rejected`). Every
-dashboard page has a "← Composer" link back to the landing page, and the right panel has a
-**"↺ Revert back"** button that wipes and reseeds the database plus clears every generated artifact,
-so you can restart the whole demo clean without restarting the server. Stop the server with Ctrl+C
-when you're done.
+the execution visualizer for the result. Below the dropdown are two real compose boxes, each with a
+**ghost-text body editor** — the label before each colon ("Objective:", "New launch date:", etc.) is
+fixed, real text you can't type over or delete, and only the hint after it is greyed out; click it and
+it clears instantly, so you never have to remember or retype the field format:
+- **"or submit your own"** (From/Subject/Body) runs genuinely typed text through the real pipeline via
+  Agent 1's actual parser — see "Mock mode" below for what's genuinely live versus mocked in that path.
+- **"or send a project update"** lets you pick any real accepted/in_progress project (live DB state,
+  not a fixed list) and submit a typed update email (new launch date/CAPEX/risk/schedule/resource + a
+  note) through Agent 11's real parser and Agent 12's real evaluation — favorable changes apply
+  immediately, unfavorable ones open a real Manual Gate 3, where PMO can Accept, Decline, or
+  **Cancel the project entirely** (a distinct `cancelled` status, separate from `rejected`). This panel
+  moved here from the portfolio dashboard — "the list is an interactive database" now lives with the
+  rest of the composer's real actions, not as a dashboard widget.
+
+The portfolio dashboard (`dashboard/topline.html`) embeds §5.3's Periodic Gate 2 Review queue directly
+— Open/Close batch and Review/Override are real buttons there now, not a separate composer entry. Its
+distribution panels are five real, computed-from-real-data governance views: Status Distribution,
+Strategic Coverage (Aligned vs Orphaned, from Agent 6's alignment verdict), CAPEX Funding Coverage
+(fully/partially/unfunded), Predictive Portfolio Health (Agent 10's real success-score bucketed
+High/Medium/Low/Under monitoring), and Portfolio Value by Business Unit — see TECH-SPEC.md §14 for why
+three OTHER requested metrics (capacity variance, CapEx/OpEx ratio, dependency-resolution time) are
+deliberately not there. Every dashboard page has a "← Composer" link back to the landing page, and the
+right panel has a **"↺ Revert back"** button that wipes and reseeds the database plus clears every
+generated artifact, so you can restart the whole demo clean without restarting the server. Stop the
+server with Ctrl+C when you're done.
 
 ## Seeing the actual system run — from the terminal
 
@@ -118,5 +129,5 @@ All three came out of a deliberate comparison against a teammate's repo (the fir
 - `src/` — agents, orchestration (state machine, guardrails), db, notifications, LLM client (`src/llm/client.py` for text, `src/llm/embeddings.py` for the optional real-embeddings backend)
 - `scripts/demo_engine.py` — shared logic for running a scenario (seeding, pipeline, rendering); `demo_server.py` (browser composer) and `run_demo.py` (CLI) both call into it
 - `dashboard/` — rendered HTML output (topline, visualizer, comments, notifications, activity feed)
-- `tests/` — the 234 acceptance checks across all 13 build phases
+- `tests/` — the 239 acceptance checks across all 13 build phases
 - `docs/comparing-foos-repo.md` — the teammate-repo comparison this session's upversion came from: what was adopted, what was deliberately skipped, and the exact rollback plan
