@@ -22,7 +22,7 @@ No API key is required to run or test this build — it runs in mock mode automa
 ./run_all_tests.sh
 ```
 
-Runs all 12 phase test files in order (`tests/scenarios/`, `tests/eval/`) and prints pass/fail counts. 189 checks total, covering agents, the state machine, guardrails, the full pipeline across all 10 named scenarios (7 original + 3 batch-queue cases), the post-acceptance change-management/OPL loop, the periodic Gate 2 review queue (now embedded on the topline dashboard), the dashboard/visualizer/comment panel, the topline's metric cards/distribution panels/sortable table, and the composer's freeform "compose your own" submission path. To run one phase at a time:
+Runs all 12 phase test files in order (`tests/scenarios/`, `tests/eval/`) and prints pass/fail counts. 198 checks total, covering agents, the state machine, guardrails, the full pipeline across all 10 named scenarios (7 original + 3 batch-queue cases), the post-acceptance change-management/OPL loop, the periodic Gate 2 review queue (now embedded on the topline dashboard), the dashboard/visualizer/comment panel, the topline's metric cards/distribution panels/sortable table, and the composer's freeform "compose your own" submission path. To run one phase at a time:
 
 ```
 python3 tests/scenarios/test_phase1.py
@@ -110,5 +110,5 @@ All three came out of a deliberate comparison against a teammate's repo (the fir
 - `src/` — agents, orchestration (state machine, guardrails), db, notifications, LLM client (`src/llm/client.py` for text, `src/llm/embeddings.py` for the optional real-embeddings backend)
 - `scripts/demo_engine.py` — shared logic for running a scenario (seeding, pipeline, rendering); `demo_server.py` (browser composer) and `run_demo.py` (CLI) both call into it
 - `dashboard/` — rendered HTML output (topline, visualizer, comments, notifications, activity feed)
-- `tests/` — the 189 acceptance checks across all 12 build phases
+- `tests/` — the 198 acceptance checks across all 12 build phases
 - `docs/comparing-foos-repo.md` — the teammate-repo comparison this session's upversion came from: what was adopted, what was deliberately skipped, and the exact rollback plan

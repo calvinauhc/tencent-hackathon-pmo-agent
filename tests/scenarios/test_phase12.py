@@ -94,6 +94,22 @@ check("12.7 Case 9 shows a From/Subject email header, not descriptive prose", '<
 check("12.7 Case 9's email body is the real CHANGE_CASE_EMAILS content", "flagging a new dependency risk" in panel9, None)
 check("12.7 Case 8/9 use the same plain 'Run this case' button cases 1-7 use, not 'Simulate...'", "Simulate" not in panel8 and "Simulate" not in panel9, None)
 
+# --- 12.8 Case 8/9's redirect after a real decision carries the notification Agent 12 wrote, so the
+# composer's right panel can show it (render_topline.py reads it back on load and posts it to the
+# parent) — reported bug: after declining Case 9, nothing signalled the decision was even recorded. ---
+case8_result = demo_server.submit_project_update("PRJ-2026-0791", "favorable")
+check("12.8 Case 8 (auto-applied) redirect carries a real notification, not a bare topline URL",
+      "notif_subject=" in case8_result["redirect"] and "notif_body=" in case8_result["redirect"],
+      case8_result["redirect"])
+
+case9_result = demo_server.submit_project_update("PRJ-2026-0791", "unfavorable")
+gate3_reject = demo_server.resolve_gate3_decision(case9_result["change_request_id"], "reject", pmo_comment="declining for the test")
+check("12.8 Case 9 reject's redirect ALSO carries a real notification — the actual fix for the "
+      "reported bug (a decline correctly leaves the project unchanged, but the PMO still needs "
+      "confirmation the decision was recorded)",
+      "notif_subject=" in gate3_reject["redirect"] and "not+authorized" in gate3_reject["redirect"].lower(),
+      gate3_reject["redirect"])
+
 print()
 passed = sum(1 for _, s in results if s == "PASS")
 print(f"Phase 12: {passed}/{len(results)} checks passed")

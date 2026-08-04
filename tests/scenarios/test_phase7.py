@@ -54,6 +54,10 @@ check("7.2 the live projects row actually reflects the new values", s1_after["ca
 
 notifs = get_notifications(conn, s1_after["project_id"])
 check("7.2 an auto-applied notification was sent", any("Auto-applied" in n["subject"] for n in notifs), [n["subject"] for n in notifs])
+check("7.2 process_update() also returns that notification directly (not just written to the DB) — "
+      "scripts/demo_engine.py's composer surfaces this to the right panel, since Case 8/9 never run "
+      "through the visualizer that normally does",
+      "notification" in result_fav and "Auto-applied" in result_fav["notification"]["subject"], result_fav.get("notification"))
 
 # --- 7.3 process_update(): unfavorable path opens a real Gate 3, does NOT touch the live row ---
 entry_unfav = log_update(conn, s1_after, {"capex_usd": 90000, "risk_indicator": "yellow"},
@@ -72,7 +76,7 @@ pending = get_pending_change_requests(conn)
 check("7.3 the pending list surfaces it", any(p["id"] == result_unfav["change_request_id"] for p in pending), len(pending))
 
 # --- 7.4 Gate 3 resolution: Accept applies the change PMO just authorized ---
-resolve_gate3(conn, result_unfav["change_request_id"], "accept", s1_still["project_name"], pmo_comment="Approved — scope growth is justified.")
+gate3_accept_result = resolve_gate3(conn, result_unfav["change_request_id"], "accept", s1_still["project_name"], pmo_comment="Approved — scope growth is justified.")
 s1_final = get_project(conn, "SUB-0001")
 check("7.4 Gate 3 accept applies the originally-captured after_state", s1_final["capex_usd"] == 90000 and s1_final["risk_indicator"] == "yellow")
 
@@ -81,16 +85,24 @@ check("7.4 change_requests row is marked approved", cr_resolved["status"] == "ap
 
 notifs2 = get_notifications(conn, s1_final["project_id"])
 check("7.4 requester was notified the change was authorized", any("authorized" in n["subject"].lower() for n in notifs2), [n["subject"] for n in notifs2])
+check("7.4 resolve_gate3() also returns that notification directly, for the same reason as 7.2 above",
+      "notification" in gate3_accept_result and "authorized" in gate3_accept_result["notification"]["subject"].lower(),
+      gate3_accept_result.get("notification"))
 
 # --- 7.5 Gate 3 resolution: Reject leaves the live row untouched ---
 entry_unfav2 = log_update(conn, s1_final, {"capex_usd": 150000}, submitted_by="Grace Lim", note="Vendor re-quote, much higher.")
 result_unfav2 = process_update(conn, entry_unfav2, s1_final["project_name"], requested_by="Grace Lim")
-resolve_gate3(conn, result_unfav2["change_request_id"], "reject", s1_final["project_name"], pmo_comment="Too large an increase — resubmit with a revised scope.")
+gate3_reject_result = resolve_gate3(conn, result_unfav2["change_request_id"], "reject", s1_final["project_name"], pmo_comment="Too large an increase — resubmit with a revised scope.")
 s1_after_reject = get_project(conn, "SUB-0001")
 check("7.5 Gate 3 reject leaves the live projects row unchanged", s1_after_reject["capex_usd"] == 90000, s1_after_reject["capex_usd"])
 
 cr_rejected = get_change_request(conn, result_unfav2["change_request_id"])
 check("7.5 change_requests row is marked rejected", cr_rejected["status"] == "rejected")
+check("7.5 resolve_gate3() returns a real 'not authorized' notification on reject too — this is the "
+      "actual fix: the project correctly stays unchanged, but the PMO still needs to see confirmation "
+      "that the decision itself was recorded, not just an unchanged table with no feedback",
+      "notification" in gate3_reject_result and "not authorized" in gate3_reject_result["notification"]["subject"].lower(),
+      gate3_reject_result.get("notification"))
 
 # --- 7.6 double-resolving the same change_request raises, doesn't silently double-apply ---
 raised = False

@@ -314,6 +314,30 @@ def render():
     }});
   }});
 }})();
+
+// Case 8/9 (§7.2 change management) never run through the Live Execution Visualizer, which is
+// normally what tells the composer's right panel a notification just fired — so scripts/
+// demo_engine.py's _redirect_with_notification() carries the real notification Agent 12 wrote
+// (auto-applied, Gate 3 authorized, or Gate 3 declined) here as a query string instead. Post it to
+// the parent exactly like the visualizer does, so a PMO who just clicked Decline sees real
+// confirmation that the decision was recorded, not just an unchanged table with no feedback at all.
+(function() {{
+  var params = new URLSearchParams(window.location.search);
+  var subject = params.get('notif_subject');
+  if (subject) {{
+    try {{
+      window.parent.postMessage({{type: 'notification', notif: {{
+        trigger_label: params.get('notif_trigger') || 'Agent 12 · Change evaluator',
+        subject: subject, body: params.get('notif_body') || '',
+        recipient: params.get('notif_recipient') || 'Project team',
+        channel: params.get('notif_channel') || 'email',
+      }}}}, '*');
+    }} catch (e) {{}}
+    if (window.history && window.history.replaceState) {{
+      window.history.replaceState({{}}, '', window.location.pathname + window.location.hash);
+    }}
+  }}
+}})();
 </script>
 </body></html>"""
     out_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "topline.html"))

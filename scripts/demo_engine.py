@@ -9,7 +9,7 @@ data/trial-projects.json's scenario_index (§12), phrased as a real submitter wo
 from that scenario's real trial-data fields (not fabricated). This is what the composer landing
 page (dashboard's entry point, §12.1) shows and lets you click to run.
 """
-import sys, os, json, time
+import sys, os, json, time, urllib.parse
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from src.db.client import get_connection
 from src.db.repositories import (
@@ -372,6 +372,26 @@ def _ensure_seeded(conn, project_ref):
         insert_project(conn, p)
     return get_project_by_ref(conn, project_ref)
 
+def _redirect_with_notification(base_path, notif, trigger_label="Agent 12 · Change evaluator"):
+    """§7.2's change-management flow (Case 8/9) never runs through the Live Execution Visualizer,
+    which is normally what posts each notification to the composer's right panel as it replays
+    (dashboard/render_visualizer.py's tellParent()) — so without this, a real notification gets
+    written to the DB (Agent 12 always writes one, auto-applied or Gate 3 accept/reject alike) but
+    the PMO watching the composer never sees any confirmation that their decision did anything,
+    especially on reject, where the project itself is correctly left unchanged too. Carries the
+    notification in the redirect URL's query string; render_topline.py's own small script reads it
+    on load and posts it to the parent exactly like the visualizer does, then strips the query
+    string so a refresh doesn't re-fire it."""
+    if not notif:
+        return base_path
+    qs = urllib.parse.urlencode({
+        "notif_subject": notif.get("subject", ""), "notif_body": notif.get("body", ""),
+        "notif_trigger": trigger_label, "notif_recipient": notif.get("recipient", ""),
+        "notif_channel": notif.get("channel", "email"),
+    })
+    return f"{base_path}?{qs}"
+
+
 def submit_project_update(project_ref, kind):
     """Runs Agent 11 (capture) then Agent 12 (evaluate + apply-or-escalate) against a live project.
     `kind` selects one of the two canned CHANGE_DEMO_PAYLOADS. Returns where the composer should
@@ -393,8 +413,9 @@ def submit_project_update(project_ref, kind):
     render_activity()
 
     if result["applied"]:
+        redirect = _redirect_with_notification("/dashboard/topline.html", result.get("notification"))
         return {"applied": True, "evaluation": result["evaluation"], "reason": result["reason"],
-                "redirect": "/dashboard/topline.html"}
+                "redirect": redirect}
 
     cr = get_change_request(conn, result["change_request_id"])
     gate3_path = render_gate3(result["change_request_id"], row, entry, cr)
@@ -420,7 +441,8 @@ def resolve_gate3_decision(change_request_id, decision, pmo_comment=""):
         return {"redirect": "/dashboard/topline.html", "status": cr["status"], "note": str(e)}
     render_topline()
     render_activity()
-    return {"redirect": "/dashboard/topline.html", **result}
+    redirect = _redirect_with_notification("/dashboard/topline.html", result.get("notification"))
+    return {"redirect": redirect, **result}
 
 
 # --- §7.2.3 Agent 13 (OPL Composer) — Phase 3 ---

@@ -119,7 +119,8 @@ def process_update(conn, update_entry: dict, project_name: str, requested_by=Non
         notif = change_auto_applied(project_name, project_id, before_state, after_state, verdict["reason"])
         write_notification(conn, project_id, "PMO Team", "email", notif["subject"], notif["body"],
                             trigger_agent="agent12_change_evaluator")
-        return {**verdict, "applied": True, "change_request_id": None}
+        return {**verdict, "applied": True, "change_request_id": None,
+                "notification": {**notif, "recipient": "PMO Team", "channel": "email"}}
 
     change_request_id = insert_change_request(
         conn, update_entry["id"], project_id, requested_by or update_entry.get("submitted_by"),
@@ -165,6 +166,8 @@ def resolve_gate3(conn, change_request_id, decision, project_name, pmo_comment="
                          {"change_request_id": change_request_id, "reason": pmo_comment}, 0)
         notif = change_declined(project_name, project_id, cr["reason"], pmo_comment)
 
-    write_notification(conn, project_id, cr["requested_by"] or "Project team", "email",
+    recipient = cr["requested_by"] or "Project team"
+    write_notification(conn, project_id, recipient, "email",
                         notif["subject"], notif["body"], trigger_agent="agent12_change_evaluator")
-    return {"status": "approved" if decision == "accept" else "rejected", "project_id": project_id}
+    return {"status": "approved" if decision == "accept" else "rejected", "project_id": project_id,
+            "notification": {**notif, "recipient": recipient, "channel": "email"}}
