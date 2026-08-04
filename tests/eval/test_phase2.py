@@ -21,7 +21,7 @@ projects, idx = load_trial_data()
 for p in projects:
     insert_project(conn, p)
 count = conn.execute("SELECT COUNT(*) c FROM projects").fetchone()["c"]
-check("2.1 all 100 trial entries inserted", count == 100, f"count={count}")
+check("2.1 all trial entries inserted", count == len(projects), f"count={count}, expected={len(projects)}")
 
 write_comment(conn, "PRJ-2026-0842", "Wei Ling Tan", "regulatory",
               "This touches EU customer data — confirm a GDPR review is scheduled before go-live.",

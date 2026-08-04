@@ -1,6 +1,6 @@
 """
 Portfolio activity feed — every agent step and every comment across ALL projects, merged into one
-time-ordered feed. This is the missing view of "what's actually happening across the 100 records":
+time-ordered feed. This is the missing view of "what's actually happening across the whole portfolio":
 before this, audit_log/comments could only be seen one project at a time (visualizer/comments
 panel), so there was no way to watch the workflow touch the wider portfolio.
 """

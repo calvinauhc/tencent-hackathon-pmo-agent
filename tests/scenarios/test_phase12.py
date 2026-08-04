@@ -61,7 +61,7 @@ check("12.3 it's rejected for the real reason (incomplete info), not silently gu
 check("12.3 the rejection reason names the actual missing required fields", "submitter_name" in result2["trace"].get("rejection_reason", "") and "objective" in result2["trace"].get("rejection_reason", ""), result2["trace"].get("rejection_reason"))
 check("12.3 incomplete_fields reflects every field Agent 1 couldn't find, not just the required ones", set(result2["incomplete_fields"]) == {"submitter_name", "team_members", "objective", "project_name", "solution", "business_impact_usd", "capex_usd", "hypothesis_risk"}, result2["incomplete_fields"])
 
-# --- 12.4 Agent 2's duplicate check runs against the REAL 100 trial projects, not an empty list ---
+# --- 12.4 Agent 2's duplicate check runs against the real seeded trial projects, not an empty list ---
 conn = get_connection()
 check("12.4 the trial fixture was seeded so duplicate-checking has real data to compare against", get_project(conn, "SUB-0001") is not None, "SUB-0001 present after a freeform run")
 

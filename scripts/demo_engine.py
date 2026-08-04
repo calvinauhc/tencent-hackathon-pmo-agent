@@ -167,7 +167,7 @@ SCENARIO_ORDER = [
 
 
 def run_scenario(scenario_key):
-    """Seeds all 100 trial projects, runs one scenario through the real pipeline, renders all five
+    """Seeds all trial projects, runs one scenario through the real pipeline, renders all five
     dashboard pages, and returns a dict describing what happened and where to look."""
     conn = get_connection(fresh=True)
     projects, idx = load_trial_data()
@@ -662,7 +662,7 @@ def close_batch(batch_id):
 # Agent 5/6 have no deterministic fallback of their own (only Agent 1 does — see that module's
 # docstring), so a freeform run in MOCK_MODE uses one generic, always-the-same mock response for
 # them (FREEFORM_MOCKS below) rather than content tailored to what was typed. Agent 1 (parsing) and
-# Agent 2 (duplicate check against the real 100 trial projects) still genuinely respond to the
+# Agent 2 (duplicate check against the real seeded trial projects) still genuinely respond to the
 # input — those are the two steps a novel submission actually exercises differently case to case.
 # Set a real ANTHROPIC_API_KEY (see README's Mock mode section) and Agent 5/6 go live automatically,
 # same as every other agent call in this codebase — nothing here special-cases that switch.

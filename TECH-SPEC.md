@@ -251,7 +251,7 @@ success_score = 0.3 * financial_tracking_pct
               + 0.2 * resource_tracking_pct
               + 0.2 * (1 - risk_penalty)
 ```
-where `risk_penalty` = 0 (green) / 0.5 (yellow) / 1.0 (red) on the risk indicator. **[ASSUMPTION: weights are placeholders — revisit once trial data (100 entries) is available; document this as "v1 heuristic, v2 will train on outcome data" in the pitch to score well on Business Value without overclaiming AI sophistication.]** `resource_tracking_pct` reads `resource_indicator` (§5.2) on the same 100/70/40 green/yellow/red scale as `milestone_tracking_pct` reads `schedule_status` — falls back to the older `help_needed`-based guess only for records that predate the `resource_indicator` field.
+where `risk_penalty` = 0 (green) / 0.5 (yellow) / 1.0 (red) on the risk indicator. **[ASSUMPTION: weights are placeholders — revisit once real outcome data is available (trial data, now curated to 20 entries — see §14, `docs/comparing-foos-repo.md` — was never meant to be that training signal itself); document this as "v1 heuristic, v2 will train on outcome data" in the pitch to score well on Business Value without overclaiming AI sophistication.]** `resource_tracking_pct` reads `resource_indicator` (§5.2) on the same 100/70/40 green/yellow/red scale as `milestone_tracking_pct` reads `schedule_status` — falls back to the older `help_needed`-based guess only for records that predate the `resource_indicator` field.
 
 ## 7.1 Monthly Strategic Context Briefing — new, not in brief
 
@@ -624,9 +624,11 @@ Added for §7.1 (not in brief):
 4. 1-page political considerations doc, refreshed monthly.
 5. 1-page regulatory updates doc, refreshed monthly.
 
-All 5 items exist under `data/`: `playbook.md`, `pvp.md`, `political.md`, `regulatory.md`, and `trial-projects.json` (100 synthetic entries).
+**Update — curated down to 20 (post-brief revision, see `docs/comparing-foos-repo.md`):** the original 100-entry generated set turned out to be heavily templated — only 30 of the 100 project names were actually unique, the rest were the same handful of placeholder titles with region/department swapped. Reduced to 20 real, non-duplicate entries: the 9 that anchor the 7 named demo scenarios (§12, unchanged), plus 11 chosen specifically to cover every one of the 7 `status` values and all 4 regions with genuinely distinct purposes, not templated copies. A deliberate trade against the brief's literal "100 entries" line — judged worth it for demo/data quality; the original 100 remains fully recoverable from git history (tag `pre-trial-data-reduction`) if needed.
 
-**`trial-projects.json` structure**: `{ scenario_index, projects }`. `projects` is the 100 entries spanning all seven `status` values in §3's enum. `scenario_index` maps each of §12's 7 named test scenarios directly to the `project_id`/`submission_id` that demonstrates it — e.g. scenario 6 (change request via stakeholder flag) points straight at PRJ-2026-0842, the same "Smart inventory forecasting agent" project used in the §9.2 comment-panel example, so the trial data and the worked examples in this spec are the same project, not two disconnected fixtures. `tests/scenarios/` (§15) should read fixtures via `scenario_index` rather than hardcoding IDs, so re-generating the dataset doesn't silently break the test suite.
+All 5 items exist under `data/`: `playbook.md`, `pvp.md`, `political.md`, `regulatory.md`, and `trial-projects.json` (20 curated entries, see above).
+
+**`trial-projects.json` structure**: `{ scenario_index, projects }`. `projects` is 20 entries spanning all seven `status` values in §3's enum. `scenario_index` maps each of §12's 7 named test scenarios directly to the `project_id`/`submission_id` that demonstrates it — e.g. scenario 6 (change request via stakeholder flag) points straight at PRJ-2026-0842, the same "Smart inventory forecasting agent" project used in the §9.2 comment-panel example, so the trial data and the worked examples in this spec are the same project, not two disconnected fixtures. `tests/scenarios/` (§15) should read fixtures via `scenario_index` rather than hardcoding IDs, so re-generating the dataset doesn't silently break the test suite.
 
 ## 15. Proposed repository structure
 
@@ -641,7 +643,7 @@ All 5 items exist under `data/`: `playbook.md`, `pvp.md`, `political.md`, `regul
 │   └── Participant Handbook (AIT x Tencent Hackathon) - HackMD.md
 │
 ├── data/                           # §14 trial documents
-│   ├── trial-projects.json        # 100 synthetic entries
+│   ├── trial-projects.json        # 20 curated synthetic entries (see §14)
 │   ├── playbook.md
 │   ├── pvp.md
 │   ├── political.md                # §7.1, refreshed monthly

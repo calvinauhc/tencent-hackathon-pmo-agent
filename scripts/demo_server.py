@@ -196,7 +196,7 @@ def render_landing():
 </div>
 <div class="sub" style="margin-top:8px">Runs through the real pipeline — Agent 1 parses whatever's
 typed (deterministic fallback in demo mode, so it works best matching the placeholder's shape), Agent
-2 checks it against the real 100 trial projects for duplicates. Agent 5/6 use one generic mock
+2 checks it against the real seeded trial projects for duplicates. Agent 5/6 use one generic mock
 response in demo mode (no ANTHROPIC_API_KEY); set that env var and they judge it for real too.</div>"""
 
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>PMO Intake — Composer</title>

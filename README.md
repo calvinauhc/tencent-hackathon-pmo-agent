@@ -62,13 +62,13 @@ python3 scripts/run_demo.py 6_change_request_stakeholder_flag
 ```
 
 Same underlying engine as the browser composer (`scripts/demo_engine.py`), just triggered from the
-command line instead of a click. Seeds the database with all 100 trial projects (`data/trial-projects.json`), runs the chosen scenario through the real pipeline, and renders the dashboard, visualizer, and comment panel from the result. Then open in a browser (double-click from Finder, or drag into a browser tab):
+command line instead of a click. Seeds the database with all 20 trial projects (`data/trial-projects.json`), runs the chosen scenario through the real pipeline, and renders the dashboard, visualizer, and comment panel from the result. Then open in a browser (double-click from Finder, or drag into a browser tab):
 
 - `dashboard/topline.html` — portfolio dashboard: metric cards, risk mix, needs-attention panel, project table
 - `dashboard/visualizer_PRJ-2026-0842.html` — the 1-10 agent pipeline as a graph (boxes, gate diamonds, terminal outcomes), replaying the real path this submission took at 5 seconds/step (readable pace, not a race), with a live execution log and a Replay button
 - `dashboard/comments_PRJ-2026-0842.html` — comment panel, showing the PMO-vs-stakeholder permission split
 - `dashboard/notifications_PRJ-2026-0842.html` — every notification actually sent for this project: registration, acceptance/rejection + reason, and the Agent 10 success forecast
-- `dashboard/activity.html` — portfolio-wide feed of every agent step and comment across all 100 records, not scoped to one project
+- `dashboard/activity.html` — portfolio-wide feed of every agent step and comment across all 20 records, not scoped to one project
 
 All five pages link to each other (nav bar at the top), so you can start from `topline.html` and click through the whole story for any project. Filenames for the per-project pages depend on which ID the run ended up with — rejected/duplicate/incomplete runs never get a `PRJ-` project ID (they keep their `SUB-xxxx` submission ID instead), so check the "Rendered:" lines the script prints for the exact filenames.
 
@@ -102,7 +102,7 @@ All three came out of a deliberate comparison against a teammate's repo (the fir
 - `PORTING.md` — exact steps to move this build into CodeBuddy
 - `SUBMISSION-CHECKLIST.md` — hackathon submission requirements, mapped to what's ready
 - `DEMO-TRANSCRIPT.md` — shot list for the required demo video, generated from a real run
-- `data/` — 100 synthetic trial projects, Playbook, PVP, political, and regulatory docs
+- `data/` — 20 synthetic trial projects (curated, no template duplicates — see `docs/comparing-foos-repo.md`), Playbook, PVP, political, and regulatory docs
 - `src/` — agents, orchestration (state machine, guardrails), db, notifications, LLM client (`src/llm/client.py` for text, `src/llm/embeddings.py` for the optional real-embeddings backend)
 - `scripts/demo_engine.py` — shared logic for running a scenario (seeding, pipeline, rendering); `demo_server.py` (browser composer) and `run_demo.py` (CLI) both call into it
 - `dashboard/` — rendered HTML output (topline, visualizer, comments, notifications, activity feed)
