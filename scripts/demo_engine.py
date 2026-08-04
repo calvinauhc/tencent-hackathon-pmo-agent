@@ -15,8 +15,9 @@ from src.db.client import get_connection
 from src.db.repositories import (
     insert_project, write_comment, get_project, get_project_by_ref, get_project_updates,
     get_change_request, update_status, get_gate2_queue, get_open_gate2_batch, open_gate2_batch,
-    close_gate2_batch, get_latest_agent_payload,
+    close_gate2_batch, get_latest_agent_payload, write_notification,
 )
+from src.notifications.templates import opl_published
 from src.shared.schemas import Project
 from src.shared.config import GATE2_FAST_TRACK_CAPEX_USD
 from src.db.trial_loader import load_trial_data
@@ -359,6 +360,24 @@ CHANGE_CASE_EMAILS = {
     },
 }
 
+# Case 10, same presentation fix as Case 8/9 — a real update from the project originator, not
+# descriptive prose about what a button will do. Where Case 8/9 report a field-level change, Case 10
+# reports the project is DONE and asks PMO to close it out and capture what was learned — the
+# submitter-facing trigger for Agent 13's OPL composition, the same relationship Case 8/9's emails
+# have to Agent 11/12. complete_project() still runs against real project_updates/change_requests
+# history (§7.2.3) rather than re-parsing this text — same decoupled-presentation convention as
+# CHANGE_CASE_EMAILS above.
+CASE10_EMAIL = {
+    "from": "Grace Lim <grace.lim@company.com>",
+    "subject": "Project update — Customer support AI triage is complete, ready to close out",
+    "body": "Hi PMO team,\n\nWanted to flag that Customer support AI triage (PRJ-2026-0791) has "
+            "wrapped — we hit the revised launch date and it's live in production.\n\n"
+            "Could you close this out on your end? We picked up a couple of real lessons along the "
+            "way (the vendor-quote timing, the scope/CAPEX change PMO authorized at Gate 3) that "
+            "could save the next team time if they're captured somewhere searchable rather than "
+            "just living in this thread.\n\nThanks,\nGrace",
+}
+
 def _ensure_seeded(conn, project_ref):
     """The composer's DB only has whatever the last /run/<scenario> call inserted (fresh=True wipes
     it each time) — if no scenario has been run yet this session, `projects` may be empty. Load the
@@ -567,8 +586,24 @@ def complete_project(project_ref, mock_response=None):
     render_topline()
     render_activity()
 
+    # Tell the ORIGINATOR the OPL is real and published, not just a DB row nobody heard about —
+    # same "reply to the person who asked" pattern Agent 12's change-management notifications
+    # already follow (§7.2.2), applied to §7.2.3's completion trigger for the first time.
+    recipient = row["submitter_name"] or "Project team"
+    opl_url = f"/dashboard/opl_{project_id}.html"
+    notif = opl_published(row["project_name"], project_id, opl_url)
+    write_notification(conn, project_id, recipient, "email", notif["subject"], notif["body"],
+                        trigger_agent="agent13_opl_composer")
+    notification = {**notif, "recipient": recipient, "channel": "email"}
+
+    # complete_project() (like Case 8/9's change-management flow) never runs through the Live
+    # Execution Visualizer, so this notification needs the same redirect-query-string relay —
+    # dashboard/render_opl.py's own small script reads it on load and posts it to the composer's
+    # right panel, exactly like topline.html already does for Case 8/9.
+    redirect = _redirect_with_notification(opl_url, notification, trigger_label="Agent 13 · OPL composer")
+
     return {"applied": True, "opl_path": opl_path, "dropped_ungrounded": composed.get("dropped_ungrounded", 0),
-            "redirect": f"/dashboard/opl_{project_id}.html"}
+            "notification": notification, "redirect": redirect}
 
 
 # --- §5.3 periodic Gate 2 review (cases 8/9/10) ---

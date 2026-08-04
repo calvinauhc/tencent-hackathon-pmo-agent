@@ -115,6 +115,17 @@ check("12.8 Case 9 reject's redirect ALSO carries a real notification — the ac
       "notif_subject=" in gate3_reject["redirect"] and "not+authorized" in gate3_reject["redirect"].lower(),
       gate3_reject["redirect"])
 
+# --- 12.9 Case 10 presents the same way as Case 8/9 now — a real "project complete" update email
+# from the originator, not descriptive prose about what the button does (explicit ask: make it look
+# like an update, the same as Case 8/9). ---
+panel10 = landing[landing.index('id="panel-case10"'):]
+check("12.9 Case 10 shows a From/Subject email header, not descriptive prose",
+      '<b>From:</b>' in panel10 and '<b>Subject:</b>' in panel10, None)
+check("12.9 Case 10's email body is the real CASE10_EMAIL content, not the old prose paragraph",
+      "ready to close out" in panel10 and "Runs against Case 1's already-accepted project" not in panel10, None)
+check("12.9 Case 10 uses the same plain 'Run this case' button, not 'Simulate...'",
+      "Simulate" not in panel10, None)
+
 print()
 passed = sum(1 for _, s in results if s == "PASS")
 print(f"Phase 12: {passed}/{len(results)} checks passed")

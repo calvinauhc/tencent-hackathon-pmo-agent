@@ -39,6 +39,7 @@ from demo_engine import (
     complete_project, run_batch_case, review_queued_project, override_queued_project, open_batch,
     close_batch, render_gate2_queue, submit_freeform, FREEFORM_BODY_PLACEHOLDER,
     submit_project_update_freeform, reset_demo, get_updatable_projects, UPDATE_BODY_PLACEHOLDER,
+    CASE10_EMAIL,
 )
 # Note: run_batch_case/review_queued_project/override_queued_project/open_batch/close_batch and
 # their /batch/, /queue/* HTTP routes below are kept fully wired even though the "Periodic Gate 2
@@ -225,17 +226,16 @@ def render_landing():
 </div>
 </div>""")
 
-    options.append('<option value="case10">Case 10 — Complete project, generate OPL (Agent 13)</option>')
-    panels.append("""
+    options.append('<option value="case10">Case 10 — Project update: complete, generate OPL (Agent 13)</option>')
+    panels.append(f"""
 <div class="action-panel" id="panel-case10">
 <div class="case" style="border-color:#dceafa">
-  <div class="head" style="background:#e6f1fb"><span class="title">Case 10 — Complete project, generate OPL (Agent 13)</span>
-  <span class="outcome">Expected: Project marked completed, OPL composed and published</span></div>
-  <div class="mail" style="max-height:none">
-    <div class="line">Runs against Case 1's already-accepted project (PRJ-2026-0791). Moves it through
-    in_progress to completed and has Agent 13 compose an Operational Learnings Package citing its
-    real update/change-request history — richest if Cases 8 and 9 already ran, but works standalone
-    too.</div>
+  <div class="head" style="background:#e6f1fb"><span class="title">Case 10 — Project update: complete, generate OPL (Agent 13)</span>
+  <span class="outcome">Expected: Project marked completed, OPL composed and published, originator notified with the link</span></div>
+  <div class="mail">
+    <div class="line"><b>From:</b> {html.escape(CASE10_EMAIL['from'])}</div>
+    <div class="line"><b>Subject:</b> {html.escape(CASE10_EMAIL['subject'])}</div>
+    <div class="body">{html.escape(CASE10_EMAIL['body'])}</div>
   </div>
   <form class="runbar" method="POST" action="/complete/PRJ-2026-0791" target="middle-frame">
     <button type="submit">▶ Run this case</button>

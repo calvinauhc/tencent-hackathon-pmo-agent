@@ -22,7 +22,7 @@ No API key is required to run or test this build — it runs in mock mode automa
 ./run_all_tests.sh
 ```
 
-Runs all 13 phase test files in order (`tests/scenarios/`, `tests/eval/`) and prints pass/fail counts. 239 checks total, covering agents, the state machine (including the `cancelled` status), guardrails, the full pipeline across all 10 named scenarios (7 original + 3 batch-queue cases), the post-acceptance change-management/OPL loop (including Gate 3's Cancel decision), the periodic Gate 2 review queue (now embedded on the topline dashboard), the dashboard/visualizer/comment panel, the topline's metric cards/five real distribution panels/sortable table, and the composer's two ghost-text compose boxes — freeform "compose your own" submission plus the interactive "send a project update" panel (moved from the dashboard) — and the Revert back reset. To run one phase at a time:
+Runs all 13 phase test files in order (`tests/scenarios/`, `tests/eval/`) and prints pass/fail counts. 247 checks total, covering agents, the state machine (including the `cancelled` status), guardrails, the full pipeline across all 10 named scenarios (7 original + 3 batch-queue cases), the post-acceptance change-management/OPL loop (including Gate 3's Cancel decision and Case 10's completion-notification to the originator), the periodic Gate 2 review queue (now embedded on the topline dashboard), the dashboard/visualizer/comment panel, the topline's metric cards/four real distribution panels/sortable table, and the composer's two ghost-text compose boxes — freeform "compose your own" submission plus the interactive "send a project update" panel (moved from the dashboard) — and the Revert back reset. To run one phase at a time:
 
 ```
 python3 tests/scenarios/test_phase1.py
@@ -48,11 +48,16 @@ python3 scripts/demo_server.py
 
 Starts a local-only server and prints `http://127.0.0.1:8765`. Open that in a browser — the left
 panel is a dropdown covering 10 cases: the 7 named scenarios (predrafted submission emails, real
-trial data, phrased the way a submitter would write it) plus Case 8/9/10 — post-acceptance change
-management (Agents 11/12, one action per case: favorable auto-apply, unfavorable → Gate 3) and
-project completion (Agent 13's OPL). Picking one shows its preview and a "Run this case" button;
-clicking it sends that submission through the real agent pipeline live, then drops you straight onto
-the execution visualizer for the result. Below the dropdown are two real compose boxes, each with a
+trial data, phrased the way a submitter would write it) plus Case 8/9/10 — all three now present as
+real From/Subject/Body update emails from the project originator, the same as cases 1-7, not
+descriptive prose with a generic button. Case 8/9 are post-acceptance change management (Agents
+11/12, one action per case: favorable auto-apply, unfavorable → Gate 3); Case 10 is the originator
+reporting the project's done and asking PMO to close it out, which triggers Agent 13's OPL
+composition — the resulting notification (OPL published, with a real link to it) goes back to the
+same originator, the same "reply to whoever asked" pattern Case 8/9's notifications already follow.
+Picking one shows its preview and a "Run this case" button; clicking it sends that submission through
+the real agent pipeline live, then drops you straight onto the execution visualizer for the result.
+Below the dropdown are two real compose boxes, each with a
 **ghost-text body editor** — the label before each colon ("Objective:", "New launch date:", etc.) is
 fixed, real text you can't type over or delete, and only the hint after it is greyed out; click it and
 it clears instantly, so you never have to remember or retype the field format:
@@ -128,5 +133,5 @@ All three came out of a deliberate comparison against a teammate's repo (the fir
 - `src/` — agents, orchestration (state machine, guardrails), db, notifications, LLM client (`src/llm/client.py` for text, `src/llm/embeddings.py` for the optional real-embeddings backend)
 - `scripts/demo_engine.py` — shared logic for running a scenario (seeding, pipeline, rendering); `demo_server.py` (browser composer) and `run_demo.py` (CLI) both call into it
 - `dashboard/` — rendered HTML output (topline, visualizer, comments, notifications, activity feed)
-- `tests/` — the 239 acceptance checks across all 13 build phases
+- `tests/` — the 247 acceptance checks across all 13 build phases
 - `docs/comparing-foos-repo.md` — the teammate-repo comparison this session's upversion came from: what was adopted, what was deliberately skipped, and the exact rollback plan
