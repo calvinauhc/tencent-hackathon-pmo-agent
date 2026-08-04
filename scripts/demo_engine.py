@@ -638,15 +638,19 @@ def open_batch():
     conn = get_connection()
     if get_open_gate2_batch(conn) is None:
         open_gate2_batch(conn, opened_by="PMO")
-    render_gate2_queue()
-    return {"redirect": "/dashboard/gate2_queue.html"}
+    render_gate2_queue()  # keeps the standalone gate2_queue.html page correct too
+    render_topline()
+    # Topline now embeds this same queue (§5.3 redesign) — send the middle panel back there, not to
+    # the standalone page, so the PMO sees the freshly-opened batch in place.
+    return {"redirect": "/dashboard/topline.html#gate2review"}
 
 
 def close_batch(batch_id):
     conn = get_connection()
     close_gate2_batch(conn, batch_id)
     render_gate2_queue()
-    return {"redirect": "/dashboard/gate2_queue.html"}
+    render_topline()
+    return {"redirect": "/dashboard/topline.html#gate2review"}
 
 
 # --- Freeform "compose your own" submission (§12.1 composer, "comparing Foo's repo" upversion) ---

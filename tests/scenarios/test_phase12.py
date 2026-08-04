@@ -71,12 +71,15 @@ check("12.5 FREEFORM_MOCKS has both agent5 and agent6 entries", set(demo_engine.
 check("12.5 the agent6 mock verdict is a real, valid verdict value", demo_engine.FREEFORM_MOCKS["agent6"]["verdict"] in ("aligned", "misaligned", "partially_aligned", "inconclusive"), demo_engine.FREEFORM_MOCKS["agent6"]["verdict"])
 
 # --- 12.6 render_landing() exposes exactly the dropdown/panel structure the redesign promised:
-# 7 named cases + change management + batch = 9 options, each with a matching panel, plus the
-# compose box wired to the real /submit route ---
+# 7 named cases + Case 8/9/10 (change management + completion, one action each) = 10 options, each
+# with a matching panel, plus the compose box wired to the real /submit route. Periodic Gate 2
+# Review's old batch-button entry is gone entirely — that view moved onto topline.html instead
+# (dashboard/render_topline.py's embedded queue), not a dropdown panel here anymore. ---
 import demo_server
 landing = demo_server.render_landing()
-check("12.6 the dropdown has exactly 9 options (7 cases + change management + batch)", landing.count("<option") == 9, landing.count("<option"))
-check("12.6 every option has a matching action-panel div", landing.count('class="action-panel') == 9, landing.count('class="action-panel'))
+check("12.6 the dropdown has exactly 10 options (7 cases + case 8/9/10)", landing.count("<option") == 10, landing.count("<option"))
+check("12.6 every option has a matching action-panel div", landing.count('class="action-panel') == 10, landing.count('class="action-panel'))
+check("12.6 the batch/Periodic Gate 2 Review dropdown entry is gone", "Periodic Gate 2 Review" not in landing, None)
 check("12.6 the compose box posts to the real /submit route", 'action="/submit"' in landing, '/submit' in landing)
 check("12.6 the compose box has From/Subject/Body fields, not one raw textarea", 'name="from"' in landing and 'name="subject"' in landing and 'name="body"' in landing, None)
 

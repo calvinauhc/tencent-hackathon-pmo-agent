@@ -25,7 +25,10 @@ Point out: nodes light up as each agent runs, duration shown per node.
 
 ## Beat 5 — Open the topline dashboard
 File: `dashboard/topline.html`
-20 projects shown. Point out the 4 metric cards, risk-mix strip, and needs-attention panel.
+Active projects shown. Point out the 4 metric cards (Total Projects, Portfolio value, Approved rate,
+Avg success likelihood), the Status + Strategic Alignment distribution panels, the risk-mix strip, the
+needs-attention panel, and the embedded Periodic Gate 2 Review queue below it. Try clicking a table
+column header to show the sort.
 
 ## Beat 6 — Open the comment panel, show the governance split
 File: `dashboard/comments_PRJ-2026-0842.html`

@@ -87,8 +87,13 @@ def _badge(val):
     return f'<span class="badge {val}">{val}</span>'
 
 
-def render():
-    conn = get_connection()
+def render_queue_fragment(conn):
+    """The queue's actual content — banner, batch-status bar, regional rollups, queued-project
+    table — as a standalone HTML fragment (no <html>/<body>/nav wrapper), so both the standalone
+    gate2_queue.html page below AND the embedded copy on topline.html (dashboard/render_topline.py,
+    per the ask to move Periodic Gate 2 Review "into" the topline dashboard rather than leaving it
+    only reachable through the old composer batch buttons) render from exactly one computation —
+    never two copies of this logic that could drift apart. Returns (fragment_html, queue_len)."""
     queue_rows = get_gate2_queue(conn)
     rollups = _compute_region_rollups(conn, queue_rows)
     open_batch = get_open_gate2_batch(conn)
@@ -139,10 +144,7 @@ def render():
         if rows_html else '<div class="empty">The Gate 2 queue is empty — nothing is currently sitting at Manual Gate 2.</div>'
     )
 
-    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Gate 2 — Batch Queue</title>
-<style>{CSS}</style></head><body>
-<div class="nav"><a href="/dashboard/topline.html" target="_top">← Dashboard</a></div>
-<div class="banner"><b>Periodic Gate 2 Review (§5.3).</b> Every project here has finished Agent 5/6
+    fragment = f"""<div class="banner"><b>Periodic Gate 2 Review (§5.3).</b> Every project here has finished Agent 5/6
 analysis and is waiting for a real Gate 2 decision — reviewed together, weekly by default, so a
 region's budget is seen as one shared pool, not project-by-project blind spots. Sub-${GATE2_FAST_TRACK_CAPEX_USD:,.0f}
 projects skip this queue automatically (playbook.md's existing fast-track tier); anything else can
@@ -151,12 +153,24 @@ still be pulled out early with a logged reason.</div>
 <h3 style="font-size:14px;margin-bottom:8px">Regional CAPEX rollup</h3>
 <div class="rollups">{rollups_html}</div>
 <h3 style="font-size:14px;margin-bottom:8px">Queued projects ({len(queue_rows)})</h3>
-{table_html}
+{table_html}"""
+    return fragment, len(queue_rows)
+
+
+def render():
+    """Standalone gate2_queue.html page — kept for direct linking/debugging even though the primary
+    PMO entry point is now the embedded copy on topline.html (see render_queue_fragment() above)."""
+    conn = get_connection()
+    fragment, queue_len = render_queue_fragment(conn)
+    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Gate 2 — Batch Queue</title>
+<style>{CSS}</style></head><body>
+<div class="nav"><a href="/dashboard/topline.html" target="_top">← Dashboard</a></div>
+{fragment}
 </body></html>"""
     out_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "gate2_queue.html"))
     with open(out_path, "w") as f:
         f.write(html)
-    return out_path, len(queue_rows)
+    return out_path, queue_len
 
 
 if __name__ == "__main__":

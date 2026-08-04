@@ -19,9 +19,12 @@ base = os.path.join(os.path.dirname(__file__), "..", "..", "dashboard")
 # --- 4.1 topline dashboard ---
 with open(os.path.join(base, "topline.html")) as f:
     topline_html = f.read()
-check("4.1 topline has 4 metric cards", topline_html.count('class="card"') == 4)
+check("4.1 topline has 4 metric cards", topline_html.count('class="mcard"') == 4)
+check("4.1 topline has status + strategic alignment distribution panels", topline_html.count('class="distro"') == 2)
 check("4.1 topline has risk-mix strip", "Risk mix" in topline_html)
-check("4.1 topline has a project table", "<table>" in topline_html)
+check("4.1 topline embeds the Periodic Gate 2 Review queue", 'id="gate2review"' in topline_html and "Periodic Gate 2 Review" in topline_html)
+check("4.1 topline table headers are sortable", 'class="sortable"' in topline_html and "sort" in topline_html.lower())
+check("4.1 topline has a project table", "<table" in topline_html)
 has_attention = "Needs attention" in topline_html
 check("4.1 needs-attention panel renders when a red project has help_needed", has_attention, "present" if has_attention else "no red+help_needed project in this run — check separately below")
 
