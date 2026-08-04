@@ -20,11 +20,12 @@ Two additions on top of the original topline (both requested together, see docs/
    left-panel batch buttons (cases 8a/8b/9/10) are gone; this embedded view plus its own
    Open/Close-batch and Review/Override buttons are now the one real entry point.
 """
-import sys, os
+import sys, os, re, html as html_lib
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from src.db.client import get_connection
 from src.db.repositories import get_latest_agent_payload
 from src.agents.agent10_success_predictor import predict_or_monitor
+from src.agents.agent11_update_logger import UPDATE_BODY_PLACEHOLDER
 from dashboard.render_gate2_queue import render_queue_fragment
 
 CSS = """
@@ -79,6 +80,25 @@ button:hover{background:#2c6fb3}
 .override-form button{padding:3px 8px;font-size:11px;background:#ef9f27}
 .override-form button:hover{background:#d98a1a}
 .empty{color:#888;font-size:13px;padding:20px;text-align:center}
+
+/* Interactive per-project update compose panel */
+#update-compose{border:1px solid #e5e3dc;border-radius:10px;padding:14px 16px;background:#fff;margin-bottom:20px}
+#update-compose label{font-size:11px;color:#5f5e5a;display:block;margin-bottom:3px;margin-top:10px}
+#update-compose label:first-child{margin-top:0}
+#update-compose select,#update-compose input,#update-compose textarea{width:100%;font-size:12px;font-family:inherit;padding:6px 8px;border:1px solid #e5e3dc;border-radius:6px;box-sizing:border-box}
+#update-compose textarea{height:110px;resize:vertical}
+#update-compose .runbar{text-align:right;margin-top:12px}
+#update-compose .sub{color:#888;font-size:11px;margin-top:8px;line-height:1.5}
+/* Ghost-text body editor: the label before each colon is fixed, real text (contenteditable=false);
+   the hint after it is greyed-out ghost text that clears the instant you click into it, so you can
+   type the value straight away without re-typing or remembering the label. */
+#update-compose .body-editable{width:100%;font-size:12px;font-family:inherit;padding:8px;border:1px solid #e5e3dc;border-radius:6px;box-sizing:border-box;min-height:118px;line-height:1.8;cursor:text}
+#update-compose .body-editable:focus{outline:2px solid #d8d4c8;outline-offset:1px}
+#update-compose .uline{white-space:pre-wrap}
+#update-compose .uline.note-row{margin-top:10px}
+#update-compose .uline .lbl{color:#2a2a28}
+#update-compose .uline .ghost{color:#a8a49a}
+#update-compose .uline .filled{color:#2a2a28}
 """
 
 # Ordinal ranking so ascending sort reads green -> yellow -> red -> in-review, the same order the
@@ -104,22 +124,28 @@ def render():
     approved_rows = [r for r in all_rows if r["status"] in APPROVED_STATUSES]
     pending_rows = [r for r in all_rows if r["status"] in PENDING_STATUSES]
     rejected_rows = [r for r in all_rows if r["status"] == "rejected"]
+    # Cancelled is deliberately its own bucket, not folded into "rejected" — a cancelled project was
+    # accepted, then stopped later (typically PMO acting on a post-acceptance update revealing it's
+    # slipping badly, §7.2/Gate 3's Cancel decision), which is real information distinct from a
+    # proposal that was never approved in the first place.
+    cancelled_rows = [r for r in all_rows if r["status"] == "cancelled"]
     # Duplicate rejections are a real, distinguishable subset — Agent 2's rejection_reason always
     # starts "Duplicate of ..." (src/agents/agent2_...). Everything else rejected (misaligned at
     # Gate 1, incomplete at Agent 1, or a PMO Gate 2 rejection) buckets separately.
     dup_rejected = [r for r in rejected_rows if "duplicate of" in (r["rejection_reason"] or "").lower()]
     other_rejected = [r for r in rejected_rows if r not in dup_rejected]
 
-    # Approved rate is computed over DECIDED projects only (approved + rejected) — draft/pmo_review/
-    # analysis rows haven't reached a decision yet, so folding them into the denominator would read
-    # as "not yet decided" being silently counted against approval.
-    decided_count = len(approved_rows) + len(rejected_rows)
-    approved_rate = round(100 * len(approved_rows) / decided_count) if decided_count else None
+    # Approved rate is computed over DECIDED intake proposals only (approved + rejected) —
+    # draft/pmo_review/analysis rows haven't reached a decision yet, and cancelled projects WERE
+    # approved at intake (this metric is about the intake decision, not later lifecycle outcome), so
+    # neither belongs in this specific denominator.
+    decided_count = len(approved_rows) + len(cancelled_rows) + len(rejected_rows)
+    approved_rate = round(100 * (len(approved_rows) + len(cancelled_rows)) / decided_count) if decided_count else None
 
     # Portfolio value — same rows/definition as the original single "Portfolio value" card: projects
-    # genuinely in the pipeline (accepted through analysis), not draft or rejected ones whose
-    # business_impact was never realized. Renamed from a generic "cost savings" framing to what this
-    # number actually is.
+    # genuinely in the pipeline (accepted through analysis), not draft/rejected/cancelled ones whose
+    # business_impact was never realized (or, for cancelled, no longer being realized). Renamed from
+    # a generic "cost savings" framing to what this number actually is.
     pipeline_rows = [r for r in all_rows if r["status"] in ("accepted", "in_progress", "completed", "pmo_review", "analysis")]
     portfolio_value = sum(r["business_impact_usd"] or 0 for r in pipeline_rows)
 
@@ -153,17 +179,23 @@ def render():
     # by recency. No LIMIT: the trial fixture only has 20 rows total (see TECH-SPEC.md §14), so a
     # cap sized for the old 100-row era would silently start truncating again the moment the fixture
     # grows back past 20 — dropping it here costs nothing today and removes that latent bug. ---
-    rows = [r for r in all_rows if r["status"] in ("accepted", "in_progress", "completed", "pmo_review", "analysis")]
+    # Cancelled projects stay visible here (not silently dropped) — a PMO scanning the portfolio
+    # should see what got stopped, tagged distinctly, not have it vanish from the list entirely.
+    rows = [r for r in all_rows if r["status"] in ("accepted", "in_progress", "completed", "pmo_review", "analysis", "cancelled")]
     rows.sort(key=lambda r: r["updated_at"] or "", reverse=True)
     active_count = len(rows)
 
-    scored = [r for r in rows if r["risk_indicator"]]
+    # CAPEX and risk-mix are about CURRENT exposure on still-active work — a cancelled project isn't
+    # drawing budget or carrying risk anymore, so it's excluded from both even though it stays
+    # visible in the table above.
+    still_active_rows = [r for r in rows if r["status"] != "cancelled"]
+    scored = [r for r in still_active_rows if r["risk_indicator"]]
     capex_needed = sum(r["capex_usd"] or 0 for r in scored)
     capex_funded = sum((r["capex_usd"] or 0) * (r["capex_funded_pct"] or 0) / 100 for r in scored)
     capex_pct = round(100 * capex_funded / capex_needed) if capex_needed else 0
 
     risk_counts = {"green": 0, "yellow": 0, "red": 0, "in_review": 0}
-    for r in rows:
+    for r in still_active_rows:
         if r["risk_indicator"] in risk_counts:
             risk_counts[r["risk_indicator"]] += 1
         else:
@@ -212,7 +244,9 @@ def render():
         vis_path = os.path.join(dashboard_dir, f"visualizer_{link_id}.html")
         name_html = f'<b>{r["project_name"]}</b>'
         if os.path.isfile(vis_path):
-            return f'<a href="visualizer_{link_id}.html" style="color:#1a1a1a;text-decoration:none">{name_html}</a>'
+            name_html = f'<a href="visualizer_{link_id}.html" style="color:#1a1a1a;text-decoration:none">{name_html}</a>'
+        if r["status"] == "cancelled":
+            name_html += ' <span class="badge gray">cancelled</span>'
         return name_html
 
     def rank(val):
@@ -238,6 +272,7 @@ def render():
     status_bars = (
         _bar_row("Approved / in progress", len(approved_rows), total_projects, "#5fd07a")
         + _bar_row("Pending review", len(pending_rows), total_projects, "#e8b34d")
+        + _bar_row("Cancelled", len(cancelled_rows), total_projects, "#8fa3c7")
         + _bar_row("Rejected — duplicate", len(dup_rejected), total_projects, "#e0894f")
         + _bar_row("Rejected — other", len(other_rejected), total_projects, "#e2574f")
     )
@@ -254,6 +289,67 @@ def render():
         f'<th class="sortable" data-col="{i}">{label}<span class="arrow"></span></th>'
         for i, label in enumerate(sortable_cols)
     )
+
+    # "The list is an interactive database" — pick any accepted/in_progress project and send it a
+    # real update email (scripts/demo_engine.py's submit_project_update_freeform(), parsed by
+    # src/agents/agent11_update_logger.py's parse_update_email()). Only projects a real update can
+    # legitimately apply to are offered — draft/pmo_review/analysis rows haven't been accepted yet,
+    # and completed/cancelled/rejected ones are already terminal (schemas.py's ALLOWED_TRANSITIONS).
+    updatable_rows = [r for r in rows if r["status"] in ("accepted", "in_progress")]
+    update_options = "".join(
+        f'<option value="{html_lib.escape(r["project_id"] or r["submission_id"])}" '
+        f'data-name="{html_lib.escape(r["project_name"] or "")}" '
+        f'data-submitter="{html_lib.escape(r["submitter_name"] or "")}">'
+        f'{html_lib.escape(r["project_name"] or "")} ({html_lib.escape(r["project_id"] or r["submission_id"])})</option>'
+        for r in updatable_rows
+    )
+    # Ghost-text body editor: parse UPDATE_BODY_PLACEHOLDER (agent11_update_logger.py's single source
+    # of truth for the labeled-line update format, also what parse_update_email() matches) into
+    # (label, hint) pairs. The label before each colon renders as real, fixed text
+    # (contenteditable="false") — it's always there and can't be deleted by accident — while only the
+    # hint after it is greyed-out ghost text: click it and it clears immediately so you can type the
+    # value straight in, no need to remember or retype the field name.
+    _ghost_line_re = re.compile(r"^(?P<label>.+?:\s*\$?)<(?P<hint>.+)>$")
+    ghost_lines = [
+        m.groupdict()
+        for m in (_ghost_line_re.match(ln) for ln in UPDATE_BODY_PLACEHOLDER.splitlines() if ln.strip())
+        if m
+    ]
+    field_lines, note_line = ghost_lines[:-1], ghost_lines[-1]
+
+    def _ghost_row(label, hint, extra_class=""):
+        return (
+            f'<div class="uline{extra_class}">'
+            f'<span class="lbl" contenteditable="false">{html_lib.escape(label)}</span>'
+            f'<span class="ghost" data-hint="{html_lib.escape(hint)}">{html_lib.escape(hint)}</span>'
+            f'</div>'
+        )
+
+    body_editor_html = "".join(_ghost_row(l["label"], l["hint"]) for l in field_lines) + \
+        _ghost_row(note_line["label"], note_line["hint"], " note-row")
+
+    update_compose_html = f"""<h3 class="section-h">Send a project update</h3>
+<div id="update-compose">
+{'<div class="empty">No accepted or in-progress projects to update right now.</div>' if not updatable_rows else f'''
+<form method="POST" action="/project-update/submit" id="u-form">
+  <label for="u-project">Project</label>
+  <select id="u-project" name="project_ref" required>{update_options}</select>
+  <label for="u-from">From</label>
+  <input id="u-from" name="from" type="text" required>
+  <label for="u-subject">Subject</label>
+  <input id="u-subject" name="subject" type="text" required>
+  <label for="u-body">Body</label>
+  <div id="u-body-editable" class="body-editable" contenteditable="true" spellcheck="false">{body_editor_html}</div>
+  <textarea id="u-body" name="body" style="display:none"></textarea>
+  <div class="runbar"><button type="submit">✉ Submit update</button></div>
+</form>
+<div class="sub">Click any greyed-out hint to fill it in — the label stays put, only the hint clears.
+Leave a hint untouched to skip that field. Runs through the real pipeline — Agent 11 captures
+whatever's typed (deterministic parser, same labeled-line shape shown here), Agent 12 evaluates it
+and either applies it directly or opens a real Manual Gate 3 for PMO to accept, decline, or cancel
+the project.</div>
+'''}
+</div>"""
 
     html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>PMO Topline Dashboard</title><style>{CSS}</style></head>
 <body>
@@ -289,6 +385,8 @@ def render():
 {table_rows}
 </tbody></table>
 
+{update_compose_html}
+
 <script>
 (function() {{
   var state = {{ col: null, dir: 1 }};
@@ -313,6 +411,92 @@ def render():
       rows.forEach(function(r) {{ tbody.appendChild(r); }});
     }});
   }});
+}})();
+
+// Prefill From/Subject from the picked project's real data (submitter_name, project_name) — never
+// fabricated, just what's already on the row — and re-fill whenever the selection changes.
+(function() {{
+  var select = document.getElementById('u-project');
+  if (!select) return;
+  function fillFromSelection() {{
+    var opt = select.options[select.selectedIndex];
+    if (!opt) return;
+    var name = opt.dataset.submitter || 'Project team';
+    document.getElementById('u-from').value = name + ' <' + name.toLowerCase().replace(/[^a-z]+/g, '.') + '@company.com>';
+    document.getElementById('u-subject').value = 'Update: ' + (opt.dataset.name || '');
+  }}
+  select.addEventListener('change', fillFromSelection);
+  fillFromSelection();
+}})();
+
+// Ghost-text body editor: each field's label span is contenteditable="false" (real, fixed text,
+// can't be typed over or deleted) and its value span starts as gray "ghost" hint text. Clicking
+// anywhere on the row clears the hint and lets you type the real value; leaving it empty restores
+// the hint. Right before submit, only the rows actually filled in get assembled into the hidden
+// textarea, in the exact "Label: value" per-line shape parse_update_email() expects — so untouched
+// hints are correctly treated as "unchanged", not submitted as literal text.
+(function() {{
+  var editable = document.getElementById('u-body-editable');
+  if (!editable) return;
+  var hidden = document.getElementById('u-body');
+  var form = document.getElementById('u-form');
+  var lastActive = null;
+
+  function placeCaretInside(span) {{
+    var range = document.createRange();
+    range.selectNodeContents(span);
+    range.collapse(true);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }}
+  function restoreIfEmpty(span) {{
+    if (span && span.classList.contains('filled') && span.textContent.trim() === '') {{
+      span.classList.remove('filled');
+      span.classList.add('ghost');
+      span.textContent = span.dataset.hint;
+    }}
+  }}
+  function activate(span) {{
+    if (lastActive && lastActive !== span) restoreIfEmpty(lastActive);
+    if (span.classList.contains('ghost')) {{
+      span.classList.remove('ghost');
+      span.classList.add('filled');
+      span.textContent = '';
+    }}
+    placeCaretInside(span);
+    lastActive = span;
+  }}
+  Array.prototype.forEach.call(editable.querySelectorAll('.uline'), function(row) {{
+    row.addEventListener('mousedown', function(e) {{
+      e.preventDefault();
+      editable.focus();
+      activate(row.querySelector('.ghost, .filled'));
+    }});
+  }});
+  editable.addEventListener('blur', function() {{ restoreIfEmpty(lastActive); }});
+
+  if (form) {{
+    form.addEventListener('submit', function(e) {{
+      restoreIfEmpty(lastActive);
+      var lines = [];
+      Array.prototype.forEach.call(editable.querySelectorAll('.uline:not(.note-row)'), function(row) {{
+        var val = row.querySelector('.filled');
+        if (val) lines.push(row.querySelector('.lbl').textContent + val.textContent.trim());
+      }});
+      var noteRow = editable.querySelector('.uline.note-row');
+      var noteVal = noteRow && noteRow.querySelector('.filled');
+      var body = lines.join('\\n');
+      if (noteVal) {{
+        body += (lines.length ? '\\n\\n' : '') + noteRow.querySelector('.lbl').textContent + noteVal.textContent.trim();
+      }}
+      hidden.value = body;
+      if (!body.trim()) {{
+        e.preventDefault();
+        alert('Click a hint and fill in at least one field or a note before submitting.');
+      }}
+    }});
+  }}
 }})();
 
 // Case 8/9 (§7.2 change management) never run through the Live Execution Visualizer, which is

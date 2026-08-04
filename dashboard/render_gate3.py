@@ -31,6 +31,8 @@ body{font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:680px;margin
 .accept:hover{background:#527d1c}
 .reject{background:#e24b4a;color:#fff}
 .reject:hover{background:#c53d3c}
+.cancel{background:#5f5e5a;color:#fff}
+.cancel:hover{background:#464540}
 .comment-panel{margin-top:16px}
 .comment-panel label{font-size:12px;font-weight:600;color:#5f5e5a;display:block;margin-bottom:4px}
 .comment-panel textarea{width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:6px;padding:8px;font-size:13px;font-family:inherit}
@@ -85,18 +87,19 @@ Note: {html_lib.escape(update_entry.get('note') or '—')}
 <div class="decision">
   <button type="button" class="accept" id="accept-btn">✓ Authorize this change</button>
   <button type="button" class="reject" id="reject-btn">✗ Decline</button>
+  <button type="button" class="cancel" id="cancel-btn">🛑 Cancel this project</button>
 </div>
 <div class="comment-panel">
   <label>PMO comment (optional — sent to the requester either way)</label>
-  <textarea id="comment-field" rows="2" placeholder="e.g. reason for declining, or conditions attached to authorizing..."></textarea>
+  <textarea id="comment-field" rows="2" placeholder="e.g. reason for declining, conditions attached to authorizing, or why the project is being stopped..."></textarea>
 </div>
 <div id="gate3-status" style="font-size:12px;color:#888;margin-top:10px"></div>
 <script>
+var allButtons = ['accept-btn', 'reject-btn', 'cancel-btn'];
 function submitDecision(decision) {{
   const statusEl = document.getElementById('gate3-status');
-  document.getElementById('accept-btn').disabled = true;
-  document.getElementById('reject-btn').disabled = true;
-  statusEl.innerText = 'Submitting…';
+  allButtons.forEach(function(id) {{ document.getElementById(id).disabled = true; }});
+  statusEl.innerText = decision === 'cancel' ? 'Cancelling the project…' : 'Submitting…';
   const body = new URLSearchParams();
   body.set('pmo_comment', document.getElementById('comment-field').value);
   fetch('/gate3/{change_request_id}/' + decision, {{
@@ -112,12 +115,16 @@ function submitDecision(decision) {{
     }})
     .catch(err => {{
       statusEl.innerText = 'Something went wrong — ' + err;
-      document.getElementById('accept-btn').disabled = false;
-      document.getElementById('reject-btn').disabled = false;
+      allButtons.forEach(function(id) {{ document.getElementById(id).disabled = false; }});
     }});
 }}
 document.getElementById('accept-btn').addEventListener('click', function() {{ submitDecision('accept'); }});
 document.getElementById('reject-btn').addEventListener('click', function() {{ submitDecision('reject'); }});
+document.getElementById('cancel-btn').addEventListener('click', function() {{
+  if (confirm('Cancel this project entirely? This stops it — a bigger step than declining just this update.')) {{
+    submitDecision('cancel');
+  }}
+}});
 </script>
 </body></html>"""
     out_path = os.path.abspath(os.path.join(os.path.dirname(__file__), f"gate3_{change_request_id}.html"))

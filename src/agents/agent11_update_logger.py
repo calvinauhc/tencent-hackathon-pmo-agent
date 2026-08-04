@@ -6,9 +6,10 @@ against an accepted/in_progress project. This agent's only job is to capture tha
 against the current baseline — it never judges whether the change is good or bad (that's Agent 12,
 §7.2.2) and never writes to the `projects` row itself.
 """
-import sys, os
+import sys, os, re
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.db.repositories import insert_project_update
+from src.agents.agent1_intake_parser import _parse_usd
 
 # Only fields that can legitimately change post-acceptance — the same five fields Agent 12's
 # favorable/unfavorable check (§7.2.2) reasons over. Anything else submitted in an update payload
@@ -66,3 +67,68 @@ def log_update(conn, project, submitted_fields: dict, submitted_by=None, note=No
         "after_state": after_state,
         "fields_changed": fields_changed,
     }
+
+
+# --- Real, typed update emails (§7.2.1, "make the list interactive" upversion) ---
+# Case 8/9 (scripts/demo_engine.py) only ever ran two hardcoded CHANGE_DEMO_PAYLOADS against one
+# fixed project. This is the genuine "any accepted/in_progress project, real typed text" entry point
+# — same relationship Agent 1's parse_intake()/_deterministic_fallback_parse() has to the 7 named
+# scenarios: a real extractor, not a stub, that never guesses a field that isn't actually stated in
+# the text. Built against the compose box's own placeholder shape (see demo_engine.py's
+# UPDATE_BODY_PLACEHOLDER) — a labeled-line format, not free prose, so extraction stays reliable
+# without needing an LLM call for something this structured.
+UPDATE_RISK_VALUES = {"green", "yellow", "red"}
+
+# Shown in the compose box (scripts/demo_engine.py, dashboard/render_topline.py) and matched exactly
+# by parse_update_email() below — defined here, not duplicated in either UI-facing module, so the
+# placeholder text and the parser it documents can never drift apart.
+UPDATE_BODY_PLACEHOLDER = (
+    "New launch date: <YYYY-MM-DD, or delete this line if unchanged>\n"
+    "New CAPEX: $<amount, or delete this line if unchanged>\n"
+    "Risk: <green/yellow/red, or delete this line if unchanged>\n"
+    "Schedule: <green/yellow/red, or delete this line if unchanged>\n"
+    "Resource: <green/yellow/red, or delete this line if unchanged>\n\n"
+    "Note: <why this update, in your own words>"
+)
+
+
+def _extract_submitter_name(from_field: str) -> str:
+    """'Grace Lim <grace.lim@company.com>' -> 'Grace Lim'. Falls back to the raw string if there's no
+    '<...>' to strip — never fabricates a name that wasn't actually typed."""
+    match = re.match(r"^\s*([^<]+?)\s*<", from_field or "")
+    return match.group(1).strip() if match else (from_field or "").strip()
+
+
+def parse_update_email(raw_text: str):
+    """Extracts only the UPDATABLE_FIELDS that are actually present, labeled-line style (same
+    convention as agent1_intake_parser.py's SCENARIO_EMAILS format, adapted to update fields instead
+    of intake fields). Returns (fields: dict, note: str|None) — `fields` only ever contains keys that
+    were genuinely found; a line that doesn't match the expected shape is simply absent, not guessed."""
+    fields = {}
+
+    date_match = re.search(r"(?:New\s+)?(?:expected\s+)?launch(?:\s+date)?:\s*(\d{4}-\d{2}-\d{2})", raw_text, re.I)
+    if date_match:
+        fields["expected_launch_date"] = date_match.group(1)
+
+    capex_match = re.search(r"(?:New\s+)?CAPEX:\s*\$?([\d.,]+\s*(?:million)?)", raw_text, re.I)
+    if capex_match:
+        parsed = _parse_usd(capex_match.group(1))
+        if parsed is not None:
+            fields["capex_usd"] = parsed
+
+    risk_match = re.search(r"\bRisk:\s*(green|yellow|red)\b", raw_text, re.I)
+    if risk_match:
+        fields["risk_indicator"] = risk_match.group(1).lower()
+
+    schedule_match = re.search(r"\bSchedule:\s*(green|yellow|red)\b", raw_text, re.I)
+    if schedule_match:
+        fields["schedule_status"] = schedule_match.group(1).lower()
+
+    resource_match = re.search(r"\bResource:\s*(green|yellow|red)\b", raw_text, re.I)
+    if resource_match:
+        fields["resource_indicator"] = resource_match.group(1).lower()
+
+    note_match = re.search(r"\bNote:\s*(.+)", raw_text, re.I | re.S)
+    note = note_match.group(1).strip() if note_match else None
+
+    return fields, note

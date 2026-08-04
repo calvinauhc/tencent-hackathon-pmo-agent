@@ -158,6 +158,20 @@ def change_declined(project_name: str, project_id: str, reason: str, pmo_comment
     )
     return {"subject": f"Update not authorized — {project_id}", "body": body}
 
+def change_cancelled(project_name: str, project_id: str, reason: str, pmo_comment: str = "") -> dict:
+    """§7.2.2 — Gate 3's Cancel decision. Requester-facing: distinct from change_declined() — that one
+    means "this specific update wasn't authorized, the project continues unchanged"; this one means
+    the project itself has been stopped, typically because the update PMO was reviewing revealed it's
+    slipping badly enough on timeline/cost/risk that continuing isn't worth it."""
+    body = (
+        f"\"{project_name}\" ({project_id}) has been cancelled by PMO.\n\n"
+        f"This decision was made while reviewing a project update flagged for authorization "
+        f"(reason: {reason}).\n"
+        + (f"PMO note: {pmo_comment}\n" if pmo_comment else "")
+        + f"\nBest regards,\nEnterprise PMO team"
+    )
+    return {"subject": f"Project cancelled — {project_id}", "body": body}
+
 def rejection_feedback(project_name: str, reason: str, pmo_comment: str = "") -> dict:
     tip = REJECTION_IMPROVEMENT_TIPS.get(reason, "Contact PMO for specific improvement guidance.")
     body = (
