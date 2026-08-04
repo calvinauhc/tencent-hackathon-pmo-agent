@@ -39,48 +39,282 @@ still be pulled out early with a logged reason.</div>
 </div>
 <h3 style="font-size:14px;margin-bottom:8px">Regional CAPEX rollup</h3>
 <div class="rollups"><div class="rollup ok">
-  <div class="region">North America</div>
-  Committed: $0 · Queued asks: $35,000<br>
-  If all approved: $35,000 of $1,500,000 budget<br>
-  Prioritization lens: <b>best ROI-ratio first</b>
+  <div class="region">Europe</div>
+  Committed: $560,498 · Queued asks: $26,913<br>
+  If all approved: $587,411 of $650,000 budget<br>
+  Prioritization lens: <b>low-risk / low-CAPEX first</b>
 </div><div class="rollup ok">
-  <div class="region">Southeast Asia</div>
-  Committed: $300,000 · Queued asks: $280,000<br>
-  If all approved: $580,000 of $1,200,000 budget<br>
+  <div class="region">North America</div>
+  Committed: $1,257,000 · Queued asks: $207,492<br>
+  If all approved: $1,464,492 of $1,500,000 budget<br>
   Prioritization lens: <b>best ROI-ratio first</b>
+</div><div class="rollup over">
+  <div class="region">Other</div>
+  Committed: $787,815 · Queued asks: $178,177<br>
+  If all approved: $965,992 of $800,000 budget<br>
+  Prioritization lens: <b>low-risk / low-CAPEX first</b><br><b>⚠ Approving everything queued would exceed budget</b>
+</div><div class="rollup over">
+  <div class="region">Southeast Asia</div>
+  Committed: $658,628 · Queued asks: $870,182<br>
+  If all approved: $1,528,810 of $1,200,000 budget<br>
+  Prioritization lens: <b>best ROI-ratio first</b><br><b>⚠ Approving everything queued would exceed budget</b>
 </div></div>
-<h3 style="font-size:14px;margin-bottom:8px">Queued projects (2)</h3>
+<h3 style="font-size:14px;margin-bottom:8px">Queued projects (16)</h3>
 <table><tr><th>Project</th><th style="text-align:right">CAPEX</th><th>Agent 5</th><th>Agent 6</th><th>Actions</th></tr><tr>
-  <td><b>Cross-border logistics optimizer</b><br>
-  <span style="color:#888;font-size:11px">Southeast Asia · Operations</span></td>
-  <td style="text-align:right">$280,000</td>
-  <td>positive</td>
-  <td><span class="badge aligned">aligned</span></td>
+  <td><b>Customer Support Tickets Initiative</b><br>
+  <span style="color:#888;font-size:11px">Europe · Quality</span></td>
+  <td style="text-align:right">$10,218</td>
+  <td>—</td>
+  <td><span class="badge gray">—</span></td>
   <td>
-    <form method="POST" action="/queue/review/SUB-CASE8B" target="middle-frame" style="margin-bottom:6px">
+    <form method="POST" action="/queue/review/SUB-0018" target="middle-frame" style="margin-bottom:6px">
       <button type="submit">Review &amp; decide</button>
     </form>
-    <form method="POST" action="/queue/override/SUB-CASE8B" target="middle-frame" class="override-form">
+    <form method="POST" action="/queue/override/SUB-0018" target="middle-frame" class="override-form">
+      <input type="text" name="reason" placeholder="Override reason..." required>
+      <button type="submit">Pull from queue</button>
+    </form>
+     <span class="badge green">fast-track eligible (&lt;$50,000)</span>
+  </td>
+</tr><tr>
+  <td><b>Equipment Maintenance Schedules Initiative</b><br>
+  <span style="color:#888;font-size:11px">Other · Regulatory</span></td>
+  <td style="text-align:right">$59,326</td>
+  <td>—</td>
+  <td><span class="badge gray">—</span></td>
+  <td>
+    <form method="POST" action="/queue/review/SUB-0025" target="middle-frame" style="margin-bottom:6px">
+      <button type="submit">Review &amp; decide</button>
+    </form>
+    <form method="POST" action="/queue/override/SUB-0025" target="middle-frame" class="override-form">
       <input type="text" name="reason" placeholder="Override reason..." required>
       <button type="submit">Pull from queue</button>
     </form>
     
   </td>
 </tr><tr>
-  <td><b>Helpdesk triage chatbot pilot</b><br>
-  <span style="color:#888;font-size:11px">North America · Engineering</span></td>
-  <td style="text-align:right">$35,000</td>
-  <td>positive</td>
-  <td><span class="badge aligned">aligned</span></td>
+  <td><b>Vendor Risk Assessments Initiative</b><br>
+  <span style="color:#888;font-size:11px">Southeast Asia · Sales</span></td>
+  <td style="text-align:right">$16,388</td>
+  <td>—</td>
+  <td><span class="badge gray">—</span></td>
   <td>
-    <form method="POST" action="/queue/review/SUB-CASE9" target="middle-frame" style="margin-bottom:6px">
+    <form method="POST" action="/queue/review/SUB-0029" target="middle-frame" style="margin-bottom:6px">
       <button type="submit">Review &amp; decide</button>
     </form>
-    <form method="POST" action="/queue/override/SUB-CASE9" target="middle-frame" class="override-form">
+    <form method="POST" action="/queue/override/SUB-0029" target="middle-frame" class="override-form">
       <input type="text" name="reason" placeholder="Override reason..." required>
       <button type="submit">Pull from queue</button>
     </form>
      <span class="badge green">fast-track eligible (&lt;$50,000)</span>
+  </td>
+</tr><tr>
+  <td><b>Marketing Content Approval Initiative</b><br>
+  <span style="color:#888;font-size:11px">North America · R&amp;D</span></td>
+  <td style="text-align:right">$11,125</td>
+  <td>—</td>
+  <td><span class="badge gray">—</span></td>
+  <td>
+    <form method="POST" action="/queue/review/SUB-0030" target="middle-frame" style="margin-bottom:6px">
+      <button type="submit">Review &amp; decide</button>
+    </form>
+    <form method="POST" action="/queue/override/SUB-0030" target="middle-frame" class="override-form">
+      <input type="text" name="reason" placeholder="Override reason..." required>
+      <button type="submit">Pull from queue</button>
+    </form>
+     <span class="badge green">fast-track eligible (&lt;$50,000)</span>
+  </td>
+</tr><tr>
+  <td><b>Supplier Lead Times Initiative</b><br>
+  <span style="color:#888;font-size:11px">Southeast Asia · Regulatory</span></td>
+  <td style="text-align:right">$211,163</td>
+  <td>—</td>
+  <td><span class="badge gray">—</span></td>
+  <td>
+    <form method="POST" action="/queue/review/SUB-0033" target="middle-frame" style="margin-bottom:6px">
+      <button type="submit">Review &amp; decide</button>
+    </form>
+    <form method="POST" action="/queue/override/SUB-0033" target="middle-frame" class="override-form">
+      <input type="text" name="reason" placeholder="Override reason..." required>
+      <button type="submit">Pull from queue</button>
+    </form>
+    
+  </td>
+</tr><tr>
+  <td><b>Equipment Maintenance Schedules Initiative</b><br>
+  <span style="color:#888;font-size:11px">Other · Engineering</span></td>
+  <td style="text-align:right">$65,521</td>
+  <td>—</td>
+  <td><span class="badge gray">—</span></td>
+  <td>
+    <form method="POST" action="/queue/review/SUB-0051" target="middle-frame" style="margin-bottom:6px">
+      <button type="submit">Review &amp; decide</button>
+    </form>
+    <form method="POST" action="/queue/override/SUB-0051" target="middle-frame" class="override-form">
+      <input type="text" name="reason" placeholder="Override reason..." required>
+      <button type="submit">Pull from queue</button>
+    </form>
+    
+  </td>
+</tr><tr>
+  <td><b>Cross-Team Project Status Initiative</b><br>
+  <span style="color:#888;font-size:11px">Southeast Asia · Finance</span></td>
+  <td style="text-align:right">$256,883</td>
+  <td>—</td>
+  <td><span class="badge gray">—</span></td>
+  <td>
+    <form method="POST" action="/queue/review/SUB-0091" target="middle-frame" style="margin-bottom:6px">
+      <button type="submit">Review &amp; decide</button>
+    </form>
+    <form method="POST" action="/queue/override/SUB-0091" target="middle-frame" class="override-form">
+      <input type="text" name="reason" placeholder="Override reason..." required>
+      <button type="submit">Pull from queue</button>
+    </form>
+    
+  </td>
+</tr><tr>
+  <td><b>Contract Renewal Dates Initiative</b><br>
+  <span style="color:#888;font-size:11px">Southeast Asia · Regulatory</span></td>
+  <td style="text-align:right">$74,567</td>
+  <td>—</td>
+  <td><span class="badge gray">—</span></td>
+  <td>
+    <form method="POST" action="/queue/review/SUB-0095" target="middle-frame" style="margin-bottom:6px">
+      <button type="submit">Review &amp; decide</button>
+    </form>
+    <form method="POST" action="/queue/override/SUB-0095" target="middle-frame" class="override-form">
+      <input type="text" name="reason" placeholder="Override reason..." required>
+      <button type="submit">Pull from queue</button>
+    </form>
+    
+  </td>
+</tr><tr>
+  <td><b>Marketing Content Approval Initiative</b><br>
+  <span style="color:#888;font-size:11px">North America · Quality</span></td>
+  <td style="text-align:right">$74,348</td>
+  <td>—</td>
+  <td><span class="badge gray">—</span></td>
+  <td>
+    <form method="POST" action="/queue/review/SUB-0027" target="middle-frame" style="margin-bottom:6px">
+      <button type="submit">Review &amp; decide</button>
+    </form>
+    <form method="POST" action="/queue/override/SUB-0027" target="middle-frame" class="override-form">
+      <input type="text" name="reason" placeholder="Override reason..." required>
+      <button type="submit">Pull from queue</button>
+    </form>
+    
+  </td>
+</tr><tr>
+  <td><b>Warehouse Teams Have Initiative</b><br>
+  <span style="color:#888;font-size:11px">Southeast Asia · R&amp;D</span></td>
+  <td style="text-align:right">$209,410</td>
+  <td>—</td>
+  <td><span class="badge gray">—</span></td>
+  <td>
+    <form method="POST" action="/queue/review/SUB-0044" target="middle-frame" style="margin-bottom:6px">
+      <button type="submit">Review &amp; decide</button>
+    </form>
+    <form method="POST" action="/queue/override/SUB-0044" target="middle-frame" class="override-form">
+      <input type="text" name="reason" placeholder="Override reason..." required>
+      <button type="submit">Pull from queue</button>
+    </form>
+    
+  </td>
+</tr><tr>
+  <td><b>Supplier Lead Times Initiative</b><br>
+  <span style="color:#888;font-size:11px">North America · Operations</span></td>
+  <td style="text-align:right">$17,995</td>
+  <td>—</td>
+  <td><span class="badge gray">—</span></td>
+  <td>
+    <form method="POST" action="/queue/review/SUB-0045" target="middle-frame" style="margin-bottom:6px">
+      <button type="submit">Review &amp; decide</button>
+    </form>
+    <form method="POST" action="/queue/override/SUB-0045" target="middle-frame" class="override-form">
+      <input type="text" name="reason" placeholder="Override reason..." required>
+      <button type="submit">Pull from queue</button>
+    </form>
+     <span class="badge green">fast-track eligible (&lt;$50,000)</span>
+  </td>
+</tr><tr>
+  <td><b>Manual Data Entry Initiative</b><br>
+  <span style="color:#888;font-size:11px">Europe · Marketing</span></td>
+  <td style="text-align:right">$16,695</td>
+  <td>—</td>
+  <td><span class="badge gray">—</span></td>
+  <td>
+    <form method="POST" action="/queue/review/SUB-0053" target="middle-frame" style="margin-bottom:6px">
+      <button type="submit">Review &amp; decide</button>
+    </form>
+    <form method="POST" action="/queue/override/SUB-0053" target="middle-frame" class="override-form">
+      <input type="text" name="reason" placeholder="Override reason..." required>
+      <button type="submit">Pull from queue</button>
+    </form>
+     <span class="badge green">fast-track eligible (&lt;$50,000)</span>
+  </td>
+</tr><tr>
+  <td><b>Invoice Reconciliation Between Initiative</b><br>
+  <span style="color:#888;font-size:11px">North America · Finance</span></td>
+  <td style="text-align:right">$57,954</td>
+  <td>—</td>
+  <td><span class="badge gray">—</span></td>
+  <td>
+    <form method="POST" action="/queue/review/SUB-0066" target="middle-frame" style="margin-bottom:6px">
+      <button type="submit">Review &amp; decide</button>
+    </form>
+    <form method="POST" action="/queue/override/SUB-0066" target="middle-frame" class="override-form">
+      <input type="text" name="reason" placeholder="Override reason..." required>
+      <button type="submit">Pull from queue</button>
+    </form>
+    
+  </td>
+</tr><tr>
+  <td><b>Marketing Content Approval Initiative</b><br>
+  <span style="color:#888;font-size:11px">Other · Quality</span></td>
+  <td style="text-align:right">$53,330</td>
+  <td>—</td>
+  <td><span class="badge gray">—</span></td>
+  <td>
+    <form method="POST" action="/queue/review/SUB-0075" target="middle-frame" style="margin-bottom:6px">
+      <button type="submit">Review &amp; decide</button>
+    </form>
+    <form method="POST" action="/queue/override/SUB-0075" target="middle-frame" class="override-form">
+      <input type="text" name="reason" placeholder="Override reason..." required>
+      <button type="submit">Pull from queue</button>
+    </form>
+    
+  </td>
+</tr><tr>
+  <td><b>Contract Renewal Dates Initiative</b><br>
+  <span style="color:#888;font-size:11px">North America · Sales</span></td>
+  <td style="text-align:right">$46,070</td>
+  <td>—</td>
+  <td><span class="badge gray">—</span></td>
+  <td>
+    <form method="POST" action="/queue/review/SUB-0088" target="middle-frame" style="margin-bottom:6px">
+      <button type="submit">Review &amp; decide</button>
+    </form>
+    <form method="POST" action="/queue/override/SUB-0088" target="middle-frame" class="override-form">
+      <input type="text" name="reason" placeholder="Override reason..." required>
+      <button type="submit">Pull from queue</button>
+    </form>
+     <span class="badge green">fast-track eligible (&lt;$50,000)</span>
+  </td>
+</tr><tr>
+  <td><b>Supplier Lead Times Initiative</b><br>
+  <span style="color:#888;font-size:11px">Southeast Asia · Engineering</span></td>
+  <td style="text-align:right">$101,771</td>
+  <td>—</td>
+  <td><span class="badge gray">—</span></td>
+  <td>
+    <form method="POST" action="/queue/review/SUB-0098" target="middle-frame" style="margin-bottom:6px">
+      <button type="submit">Review &amp; decide</button>
+    </form>
+    <form method="POST" action="/queue/override/SUB-0098" target="middle-frame" class="override-form">
+      <input type="text" name="reason" placeholder="Override reason..." required>
+      <button type="submit">Pull from queue</button>
+    </form>
+    
   </td>
 </tr></table>
 </body></html>
