@@ -172,6 +172,25 @@ def change_cancelled(project_name: str, project_id: str, reason: str, pmo_commen
     )
     return {"subject": f"Project cancelled — {project_id}", "body": body}
 
+def opl_published(project_name: str, project_id: str, opl_url: str) -> dict:
+    """§7.2.3 — sent to the project ORIGINATOR once Agent 13 composes and publishes the Operational
+    Learnings Package on project completion (Case 10). Distinct from every other template here: this
+    one isn't about a decision on the project (accept/reject/authorize/decline/cancel) — it's a
+    knowledge-management confirmation that the "what worked / what to reuse" insight future similar
+    projects will actually be checked against (§7.2.4, Agent 2/5's OPL-reuse hook) now exists and is
+    real, dereferenceable, not just a line item in the DB nobody was told about."""
+    body = (
+        f"Thanks for confirming \"{project_name}\" ({project_id}) is complete.\n\n"
+        f"An Operational Learnings Package (OPL) has been composed and published to the knowledge "
+        f"base — it captures what worked, what's worth reusing, and grounded citations from this "
+        f"project's real update/change history. It's now part of the corpus future similar "
+        f"submissions get checked against, so the lessons from this project can actually help the "
+        f"next one, not just sit on file.\n\n"
+        f"You can review it here: {opl_url}\n\n"
+        f"Best regards,\nEnterprise PMO team"
+    )
+    return {"subject": f"Project closed out — OPL published for {project_id}", "body": body}
+
 def rejection_feedback(project_name: str, reason: str, pmo_comment: str = "") -> dict:
     tip = REJECTION_IMPROVEMENT_TIPS.get(reason, "Contact PMO for specific improvement guidance.")
     body = (

@@ -39,6 +39,30 @@ corpus Agent 2 (§7.2.4) checks new submissions against, and Agent 5 can surface
 project" note for future proposals.</div>
 <div class="grounding">{grounding_note}</div>
 <div class="opl-body">{html_lib.escape(body_text)}</div>
+<script>
+// Case 10 (§7.2.3's completion trigger) never runs through the Live Execution Visualizer, which is
+// normally what tells the composer's right panel a notification just fired — so scripts/
+// demo_engine.py's complete_project() carries the real "OPL published" notification (sent to the
+// project originator) here as a query string instead, exactly like Case 8/9 already do via
+// topline.html's own copy of this same relay script.
+(function() {{
+  var params = new URLSearchParams(window.location.search);
+  var subject = params.get('notif_subject');
+  if (subject) {{
+    try {{
+      window.parent.postMessage({{type: 'notification', notif: {{
+        trigger_label: params.get('notif_trigger') || 'Agent 13 · OPL composer',
+        subject: subject, body: params.get('notif_body') || '',
+        recipient: params.get('notif_recipient') || 'Project team',
+        channel: params.get('notif_channel') || 'email',
+      }}}}, '*');
+    }} catch (e) {{}}
+    if (window.history && window.history.replaceState) {{
+      window.history.replaceState({{}}, '', window.location.pathname + window.location.hash);
+    }}
+  }}
+}})();
+</script>
 </body></html>"""
     out_path = os.path.abspath(os.path.join(os.path.dirname(__file__), f"opl_{project_id}.html"))
     with open(out_path, "w") as f:

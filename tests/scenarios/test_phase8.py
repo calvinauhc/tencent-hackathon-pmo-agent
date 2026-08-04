@@ -109,6 +109,38 @@ spp_empty_excerpt = {"project_id": "X", "project_name": "Y", "similarity": 0.1, 
 out5b, _ = analyze_business_impact(probe, mock_response=mock5, conn=conn, similar_past_project=spp_empty_excerpt)
 check("8.7 Agent 5 omits the note when there's no real excerpt to show", "similar_past_project" not in out5b)
 
+# --- 8.8 Case 10's completion trigger (scripts/demo_engine.py's complete_project()) notifies the
+# ORIGINATOR that the OPL is published, with a real link — not just a silent DB write nobody sees.
+# Explicit ask: reply the originator that the OPL has been created, reachable via the given link. ---
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
+from src.notifications.templates import opl_published
+import demo_engine
+
+notif = opl_published("Customer support AI triage", "PRJ-2026-0791", "/dashboard/opl_PRJ-2026-0791.html")
+check("8.8 opl_published() names the project and includes the real link",
+      "Customer support AI triage" in notif["body"] and "/dashboard/opl_PRJ-2026-0791.html" in notif["body"])
+check("8.8 opl_published() subject references the project id", "PRJ-2026-0791" in notif["subject"], notif["subject"])
+
+conn2 = get_connection(fresh=True)
+projects2, _idx2 = load_trial_data()
+for p in projects2:
+    insert_project(conn2, p)
+result10 = demo_engine.complete_project("PRJ-2026-0791")
+check("8.8 complete_project() returns a real notification addressed to the originator",
+      result10.get("notification", {}).get("recipient") == "Grace Lim", result10.get("notification"))
+check("8.8 complete_project()'s redirect carries the notification as query params (same relay "
+      "pattern Case 8/9 use, since this never runs through the Live Execution Visualizer either)",
+      "notif_subject=" in result10["redirect"]
+      and result10["redirect"].startswith("/dashboard/opl_PRJ-2026-0791.html?"),
+      result10["redirect"])
+
+opl_page_path = os.path.join(os.path.dirname(__file__), "..", "..", "dashboard", "opl_PRJ-2026-0791.html")
+with open(opl_page_path) as f:
+    opl_html = f.read()
+check("8.8 the OPL page carries the notif_* relay script, so the composer's right panel actually "
+      "sees the notification (the redirect target, not topline.html, needed its own copy)",
+      "notif_subject" in opl_html and "window.parent.postMessage" in opl_html)
+
 print()
 passed = sum(1 for _, s in results if s == "PASS")
 print(f"Phase 8: {passed}/{len(results)} checks passed")
