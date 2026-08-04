@@ -397,16 +397,12 @@ Auto-drafted notification text (Agent 3, 7, 8) should also pass a lightweight to
 
 **Reference: topline layout** (revised post-brief per a reference screenshot — see §14's dated update for the full disclosure of what changed and why). Stakeholders (both viewer groups) land on a summary, not a raw table:
 1. Four metric cards up top, styled as a dark summary block distinct from the rest of the page (a scoped layout choice, not an app-wide re-theme — every other page stays the existing light-cream look): **Total Projects** (every row, every status — the honest whole-portfolio count, not just the active/in-review subset below), **Portfolio value** (sum of `business_impact_usd` across pipeline-stage projects — accepted through analysis, excluding draft/rejected), **Approved rate** (approved ÷ (approved + rejected) among projects that have actually reached a decision — draft/pmo_review/analysis rows are excluded from the denominator, not silently counted against approval), **Avg success likelihood** (average `success_score` across scored projects, unchanged).
-2. Five real distribution panels alongside the cards (revised post-brief, §14's dated update — the
-   original two-panel Status/Strategic-Alignment pair grew into five governance views, all still
+2. Four real distribution panels alongside the cards (revised post-brief, §14's dated update — the
+   original two-panel Status/Strategic-Alignment pair grew into four governance views, all still
    computed from real per-project data, never a guessed figure):
    - **Status Distribution** — Approved/in progress, Pending review, Cancelled, Rejected (a single
      bucket; the earlier duplicate-vs-other rejection split was removed as low-value noise for a
      portfolio-level view), from every project's real `status`.
-   - **Strategic Coverage (Aligned vs Orphaned)** — Aligned (Agent 6 verdict `aligned` or
-     `partially_aligned`) vs Orphaned (everything else, including projects Agent 6 never actually
-     ran against in this session) — derived live per-project from `audit_log`'s
-     `agent6_knowledge_crosscheck` payload via `get_latest_agent_payload`, never a stored column.
    - **CAPEX Funding Coverage** — Fully funded / Partially funded / Unfunded, from `capex_funded_pct`,
      scoped to still-active projects that actually need CAPEX (`capex_usd` truthy).
    - **Predictive Portfolio Health** — Agent 10's real per-project success-score bucketed
@@ -414,12 +410,14 @@ Auto-drafted notification text (Agent 3, 7, 8) should also pass a lightweight to
      likelihood" metric card can hide a bimodal spread this doesn't.
    - **Portfolio Value by Business Unit** — real `business_impact_usd` summed per BU across the same
      pipeline-stage rows as the "Portfolio value" card, a concentration-risk view.
-   Three OTHER requested metrics — Allocation Variance (Actual vs Planned Capacity), CapEx/OpEx
-   Strategic Ratio, and Cross-Functional Dependency Resolution Time — are deliberately NOT
-   implemented: none of the fields they'd need (planned/actual capacity, OpEx, dependency tracking)
-   exist anywhere in this schema (§3's `Project` dataclass), and fabricating numbers for them would
-   break this project's own "never guess/never invent a figure" discipline. Add the real fields first
-   if these become genuinely wanted.
+   A fifth panel, Strategic Coverage (Aligned vs Orphaned — Agent 6 verdict `aligned`/
+   `partially_aligned` vs everything else, via `get_latest_agent_payload`), was built and then
+   removed at the user's request. Three OTHER requested metrics — Allocation Variance (Actual vs
+   Planned Capacity), CapEx/OpEx Strategic Ratio, and Cross-Functional Dependency Resolution Time —
+   were never implemented at all: none of the fields they'd need (planned/actual capacity, OpEx,
+   dependency tracking) exist anywhere in this schema (§3's `Project` dataclass), and fabricating
+   numbers for them would break this project's own "never guess/never invent a figure" discipline.
+   Add the real fields first if these become genuinely wanted.
 3. A one-line risk-mix strip — count of projects per `risk_indicator` color, plus an "in review" count for projects still pre-Gate-2 with no score yet.
 4. A **needs-attention panel**, shown whenever at least one project is red on either `risk_indicator` (with `help_needed` text attached) or `resource_indicator` (a staffing constraint gets flagged even without an accompanying `help_needed` note, using a generic "team capacity is constrained" line) — surfaces directly, by name, with no click required. This is the one place topline intentionally trades brevity for detail — a stakeholder should never have to open a red project to find out what's blocking it; that's the single most actionable thing on the whole dashboard.
 5. §5.3's **Periodic Gate 2 Review queue**, embedded directly (not linked out to a separate page) — banner, batch-status bar, regional CAPEX rollup, and the queued-project table with real Review/Override/Open-batch/Close-batch controls, rendered from the exact same computation the standalone `gate2_queue.html` page still uses (`dashboard/render_gate2_queue.py`'s `render_queue_fragment()`).
@@ -673,7 +671,7 @@ All 5 items exist under `data/`: `playbook.md`, `pvp.md`, `political.md`, `regul
 - Topline metric cards/distribution panels restyled per a reference screenshot (§9), Periodic Gate 2 Review embedded on topline instead of a composer entry (§9), composer's change-management card split into Case 8/9/10 with a real cancel/update-authorization path (§12.1).
 - A new `cancelled` project status (§3) distinct from `rejected`, a third Gate 3 decision — Cancel — alongside Accept/Reject (§7.2.2), a genuine "the list is an interactive database" per-project update panel on topline reaching ANY accepted/in_progress project via Agent 11's own deterministic email parser, and a "Revert back" button (`scripts/demo_server.py`'s right panel) that wipes/reseeds the DB and clears generated artifacts so a demo session can restart clean.
 - The "Send a project update" panel moved OFF the topline dashboard and into the composer's left panel, below "or submit your own" (§9, §12.1) — target="middle-frame" so results still show in the middle panel and notifications still surface in the right panel via the same relay Case 8/9 use. Both compose boxes now share a ghost-text body editor (label real/fixed, hint greyed-out and clears on click, §12.1) instead of a plain placeholder attribute — `FREEFORM_BODY_PLACEHOLDER` was reshaped from a two-fields-per-line format into one "Label: <hint>" per line to fit (confirmed harmless: `_deterministic_fallback_parse()`'s regexes were never line-bound for the split fields, and never used the dropped "— department, region" suffix in the first place).
-- Topline's Status Distribution dropped the duplicate-vs-other rejection split (single "Rejected" bucket — low value for a portfolio-level view) and its Strategic Alignment Distribution was replaced by five panels total: Strategic Coverage (Aligned vs Orphaned), CAPEX Funding Coverage, Predictive Portfolio Health, and Portfolio Value by Business Unit (§9) — all computed from real existing fields. Three additional requested metrics (Allocation Variance, CapEx/OpEx Ratio, Cross-Functional Dependency Resolution Time) were deliberately NOT built — no field in this schema (§3) backs any of them, and fabricating numbers would break this project's "never guess" discipline.
+- Topline's Status Distribution dropped the duplicate-vs-other rejection split (single "Rejected" bucket — low value for a portfolio-level view) and its Strategic Alignment Distribution was replaced by real governance panels (§9): CAPEX Funding Coverage, Predictive Portfolio Health, and Portfolio Value by Business Unit — all computed from real existing fields. A fourth panel, Strategic Coverage (Aligned vs Orphaned, from Agent 6's alignment verdict), was built the same pass and then removed at the user's request (`get_latest_agent_payload` no longer imported in `dashboard/render_topline.py`). Three additional requested metrics (Allocation Variance, CapEx/OpEx Ratio, Cross-Functional Dependency Resolution Time) were never built at all — no field in this schema (§3) backs any of them, and fabricating numbers would break this project's "never guess" discipline.
 
 **`trial-projects.json` structure**: `{ scenario_index, projects }`. `projects` is 20 entries spanning all seven `status` values in §3's enum. `scenario_index` maps each of §12's 7 named test scenarios directly to the `project_id`/`submission_id` that demonstrates it — e.g. scenario 6 (change request via stakeholder flag) points straight at PRJ-2026-0842, the same "Smart inventory forecasting agent" project used in the §9.2 comment-panel example, so the trial data and the worked examples in this spec are the same project, not two disconnected fixtures. `tests/scenarios/` (§15) should read fixtures via `scenario_index` rather than hardcoding IDs, so re-generating the dataset doesn't silently break the test suite.
 

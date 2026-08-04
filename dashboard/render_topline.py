@@ -16,27 +16,24 @@ Two additions on top of the original topline (both requested together, see docs/
    left-panel batch buttons (cases 8a/8b/9/10) are gone; this embedded view plus its own
    Open/Close-batch and Review/Override buttons are now the one real entry point.
 
-The distribution panels (below the metric cards) are five real, computed-from-real-data governance
-views, not a fixed pair — Status Distribution plus four requested "top management purview" metrics:
-Strategic Coverage (Aligned vs Orphaned, derived live from Agent 6's audit_log verdict — most
-seeded-but-not-actually-run trial rows genuinely have no Agent 6 payload in a given demo session
-(fresh=True wipes/reseeds on every run), so they honestly count as orphaned rather than a guessed
-"aligned"), CAPEX Funding Coverage (fully/partially/unfunded, from capex_funded_pct), Predictive
-Portfolio Health (Agent 10's real per-project success-score bucketed High/Medium/Low/Under
-monitoring/Not yet tracked — the single "Avg success likelihood" card above can hide a bimodal
-spread this doesn't), and Portfolio Value by Business Unit (real business_impact_usd summed per BU,
-a concentration-risk view). Three OTHER requested metrics — Allocation Variance (Actual vs Planned
-Capacity), CapEx/OpEx Strategic Ratio, and Cross-Functional Dependency Resolution Time — are
-deliberately NOT here: none of the fields they'd need (planned/actual capacity, OpEx, dependency
-tracking) exist anywhere in this schema (src/shared/schemas.py's Project dataclass), and fabricating
-numbers for them would break this project's own "never guess/never invent a figure" discipline
-(the same principle behind Agent 1/11's deterministic parsers and this section's own Agent 6
-fallback). Add the real fields first if these become genuinely wanted.
+The distribution panels (below the metric cards) are four real, computed-from-real-data governance
+views, not a fixed pair — Status Distribution plus three requested "top management purview" metrics:
+CAPEX Funding Coverage (fully/partially/unfunded, from capex_funded_pct), Predictive Portfolio Health
+(Agent 10's real per-project success-score bucketed High/Medium/Low/Under monitoring/Not yet tracked
+— the single "Avg success likelihood" card above can hide a bimodal spread this doesn't), and
+Portfolio Value by Business Unit (real business_impact_usd summed per BU, a concentration-risk view).
+A fourth panel, Strategic Coverage (Aligned vs Orphaned, from Agent 6's audit_log verdict), was built
+and then removed at the user's request — the underlying Agent 6 alignment-verdict lookup
+(get_latest_agent_payload) is no longer imported here. Three OTHER requested metrics — Allocation
+Variance (Actual vs Planned Capacity), CapEx/OpEx Strategic Ratio, and Cross-Functional Dependency
+Resolution Time — were never built at all: none of the fields they'd need (planned/actual capacity,
+OpEx, dependency tracking) exist anywhere in this schema (src/shared/schemas.py's Project dataclass),
+and fabricating numbers for them would break this project's own "never guess/never invent a figure"
+discipline. Add the real fields first if these become genuinely wanted.
 """
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from src.db.client import get_connection
-from src.db.repositories import get_latest_agent_payload
 from src.agents.agent10_success_predictor import predict_or_monitor
 from dashboard.render_gate2_queue import render_queue_fragment
 
@@ -158,22 +155,6 @@ def render():
             r["_pred_score"] = None
     scores = [r["_pred_score"] for r in all_rows if r["_pred_status"] == "predicted"]
     avg_score = round(sum(scores) / len(scores)) if scores else 0
-
-    # --- Strategic Coverage (Aligned vs Orphaned Initiatives) — derived live from audit_log, never
-    # stored. Most seeded trial rows genuinely never ran through Agent 6 in a given session
-    # (fresh=True wipes/reseeds on every scenario run), so anything without a real verdict counts as
-    # orphaned rather than a guessed "aligned". ---
-    alignment_counts = {"aligned": 0, "partially_aligned": 0, "misaligned": 0, "inconclusive": 0, "unassessed": 0}
-    for r in all_rows:
-        pid = r["project_id"] or r["submission_id"]
-        a6 = get_latest_agent_payload(conn, pid, "agent6_knowledge_crosscheck")
-        verdict = (a6 or {}).get("verdict")
-        if verdict in alignment_counts:
-            alignment_counts[verdict] += 1
-        else:
-            alignment_counts["unassessed"] += 1
-    coverage_aligned = alignment_counts["aligned"] + alignment_counts["partially_aligned"]
-    coverage_orphaned = total_projects - coverage_aligned
 
     # --- Predictive Portfolio Health — Agent 10's real per-project prediction (_pred_status/
     # _pred_score, just computed above), bucketed instead of only averaged. The single "Avg success
@@ -312,10 +293,6 @@ def render():
         + _bar_row("Cancelled", len(cancelled_rows), total_projects, "#8fa3c7")
         + _bar_row("Rejected", len(rejected_rows), total_projects, "#e2574f")
     )
-    coverage_bars = (
-        _bar_row("Aligned", coverage_aligned, total_projects, "#5fd07a")
-        + _bar_row("Orphaned", coverage_orphaned, total_projects, "#e2574f")
-    )
     capex_coverage_bars = (
         _bar_row("Fully funded", fully_funded, len(capex_need_rows), "#5fd07a")
         + _bar_row("Partially funded", partially_funded, len(capex_need_rows), "#e8b34d")
@@ -354,7 +331,6 @@ def render():
 
 <div class="distros">
 <div class="distro"><h4>Status Distribution</h4>{status_bars}</div>
-<div class="distro"><h4>Strategic Coverage (Aligned vs Orphaned)</h4>{coverage_bars}</div>
 <div class="distro"><h4>CAPEX Funding Coverage</h4>{capex_coverage_bars}</div>
 <div class="distro"><h4>Predictive Portfolio Health</h4>{health_bars}</div>
 <div class="distro"><h4>Portfolio Value by Business Unit</h4>{bu_bars}</div>

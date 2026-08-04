@@ -68,12 +68,11 @@ it clears instantly, so you never have to remember or retype the field format:
 
 The portfolio dashboard (`dashboard/topline.html`) embeds §5.3's Periodic Gate 2 Review queue directly
 — Open/Close batch and Review/Override are real buttons there now, not a separate composer entry. Its
-distribution panels are five real, computed-from-real-data governance views: Status Distribution,
-Strategic Coverage (Aligned vs Orphaned, from Agent 6's alignment verdict), CAPEX Funding Coverage
-(fully/partially/unfunded), Predictive Portfolio Health (Agent 10's real success-score bucketed
-High/Medium/Low/Under monitoring), and Portfolio Value by Business Unit — see TECH-SPEC.md §14 for why
-three OTHER requested metrics (capacity variance, CapEx/OpEx ratio, dependency-resolution time) are
-deliberately not there. Every dashboard page has a "← Composer" link back to the landing page, and the
+distribution panels are four real, computed-from-real-data governance views: Status Distribution,
+CAPEX Funding Coverage (fully/partially/unfunded), Predictive Portfolio Health (Agent 10's real
+success-score bucketed High/Medium/Low/Under monitoring), and Portfolio Value by Business Unit — see
+TECH-SPEC.md §14 for why three OTHER requested metrics (capacity variance, CapEx/OpEx ratio,
+dependency-resolution time) were never built at all. Every dashboard page has a "← Composer" link back to the landing page, and the
 right panel has a **"↺ Revert back"** button that wipes and reseeds the database plus clears every
 generated artifact, so you can restart the whole demo clean without restarting the server. Stop the
 server with Ctrl+C when you're done.

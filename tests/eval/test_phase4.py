@@ -20,8 +20,8 @@ base = os.path.join(os.path.dirname(__file__), "..", "..", "dashboard")
 with open(os.path.join(base, "topline.html")) as f:
     topline_html = f.read()
 check("4.1 topline has 4 metric cards", topline_html.count('class="mcard"') == 4)
-check("4.1 topline has 5 real governance distribution panels (status/coverage/capex/health/BU value)",
-      topline_html.count('class="distro"') == 5)
+check("4.1 topline has 4 real governance distribution panels (status/capex/health/BU value)",
+      topline_html.count('class="distro"') == 4)
 check("4.1 topline has risk-mix strip", "Risk mix" in topline_html)
 check("4.1 topline embeds the Periodic Gate 2 Review queue", 'id="gate2review"' in topline_html and "Periodic Gate 2 Review" in topline_html)
 check("4.1 topline table headers are sortable", 'class="sortable"' in topline_html and "sort" in topline_html.lower())
