@@ -9,7 +9,7 @@ data/trial-projects.json's scenario_index (§12), phrased as a real submitter wo
 from that scenario's real trial-data fields (not fabricated). This is what the composer landing
 page (dashboard's entry point, §12.1) shows and lets you click to run.
 """
-import sys, os, json, time, urllib.parse
+import sys, os, json, time, glob, urllib.parse
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from src.db.client import get_connection
 from src.db.repositories import (
@@ -23,7 +23,9 @@ from src.db.trial_loader import load_trial_data
 from src.orchestration.pipeline import run_submission, run_intake_to_gate2, resume_after_gate2
 from src.agents.agent1_intake_parser import parse_intake
 from src.orchestration.state_machine import transition
-from src.agents.agent11_update_logger import log_update
+from src.agents.agent11_update_logger import (
+    log_update, parse_update_email, _extract_submitter_name, UPDATE_BODY_PLACEHOLDER,
+)
 from src.agents.agent12_change_evaluator import process_update, resolve_gate3
 from src.agents.agent13_opl_composer import compose_opl, publish_opl
 from src.shared.schemas import Status
@@ -423,6 +425,53 @@ def submit_project_update(project_ref, kind):
             "change_request_id": result["change_request_id"],
             "redirect": f"/dashboard/gate3_{result['change_request_id']}.html"}
 
+
+# --- Real, typed update emails against ANY accepted/in_progress project (§7.2.1 upversion) ---
+# Case 8/9 above only ever run two hardcoded CHANGE_DEMO_PAYLOADS against one fixed project
+# (PRJ-2026-0791). This is the genuine "the list is an interactive database" entry point: pick any
+# live project from the topline table, write a real update email, and it runs through Agent 11's
+# actual parser (src/agents/agent11_update_logger.py's parse_update_email(), the same deterministic-
+# fallback convention as Agent 1's own parse_intake()/_deterministic_fallback_parse() — never guesses
+# a field that isn't actually stated) then Agent 12 exactly as Case 8/9 already do.
+def submit_project_update_freeform(project_ref, from_field, subject, body):
+    """Runs a real, typed update email through Agent 11 (parse + capture) then Agent 12 (evaluate +
+    apply-or-escalate), against whichever accepted/in_progress project was actually picked — not a
+    hardcoded one. Returns the same applied/redirect shape submit_project_update() does, so the
+    composer route handles it identically either way."""
+    conn = get_connection()
+    row = get_project_by_ref(conn, project_ref)
+    if row is None:
+        return {"error": f"Unknown project '{project_ref}'"}
+    if row["status"] not in ("accepted", "in_progress"):
+        return {"error": f"'{row['project_name']}' is status={row['status']} — only accepted or "
+                          f"in_progress projects can receive a status update."}
+
+    raw_text = f"From: {from_field}\nSubject: {subject}\n\n{body}"
+    fields, note = parse_update_email(raw_text)
+    if not fields:
+        return {"error": "No recognizable update fields found in that email — nothing to submit. "
+                          "Match the placeholder's labeled-line format (New launch date / New CAPEX / "
+                          "Risk / Schedule / Resource)."}
+
+    submitted_by = _extract_submitter_name(from_field) or "Unknown submitter"
+    entry = log_update(conn, row, fields, submitted_by=submitted_by, note=note or "(no note provided)")
+    result = process_update(conn, entry, row["project_name"], requested_by=submitted_by)
+
+    render_topline()
+    render_activity()
+
+    if result["applied"]:
+        redirect = _redirect_with_notification("/dashboard/topline.html", result.get("notification"))
+        return {"applied": True, "evaluation": result["evaluation"], "reason": result["reason"],
+                "redirect": redirect}
+
+    cr = get_change_request(conn, result["change_request_id"])
+    render_gate3(result["change_request_id"], row, entry, cr)
+    return {"applied": False, "evaluation": result["evaluation"], "reason": result["reason"],
+            "change_request_id": result["change_request_id"],
+            "redirect": f"/dashboard/gate3_{result['change_request_id']}.html"}
+
+
 def resolve_gate3_decision(change_request_id, decision, pmo_comment=""):
     """Phase 2 of the Gate 3 flow — takes the real PMO decision from the Gate 3 page and applies or
     declines the change. Uses the same DB the change was captured into (not fresh)."""
@@ -777,3 +826,32 @@ def submit_freeform(from_field, subject, body):
     rendered = _render_all(result_id)
     return {"status": "terminal", "scenario_key": None, "trace": trace, "result_id": result_id,
             "parsed_fields": fields, "incomplete_fields": parsed.get("incomplete_fields", []), **rendered}
+
+
+# --- "Revert back" (top-right of the composer's right panel) ---
+DASHBOARD_DIR = os.path.join(os.path.dirname(__file__), "..", "dashboard")
+DATA_OPL_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "opl")
+
+def reset_demo():
+    """Wipes and reseeds the DB back to the pristine 20-project trial fixture, deletes every
+    generated per-run artifact (visualizer_*.html, gate2_*.html, gate3_*.html, comments_*.html,
+    notifications_*.html, opl_*.html, and the published data/opl/*.md packets from a Case 10 run —
+    everything scripts/*.py don't ship as tracked source), and regenerates the three "always present"
+    pages (topline, activity, the standalone Gate 2 queue) fresh. Doesn't touch anything server-side
+    session state — scripts/demo_server.py clears its own PENDING/RESOLVED dicts separately, since
+    those are composer state, not demo data this function owns."""
+    for path in glob.glob(os.path.join(DASHBOARD_DIR, "*.html")):
+        os.remove(path)
+    if os.path.isdir(DATA_OPL_DIR):
+        for path in glob.glob(os.path.join(DATA_OPL_DIR, "*.md")):
+            os.remove(path)
+
+    conn = get_connection(fresh=True)
+    projects, _idx = load_trial_data()
+    for p in projects:
+        insert_project(conn, p)
+
+    render_topline()
+    render_activity()
+    render_gate2_queue()
+    return {"projects_reseeded": len(projects)}

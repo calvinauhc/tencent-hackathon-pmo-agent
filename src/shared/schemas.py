@@ -15,6 +15,13 @@ class Status(str, Enum):
     REJECTED = "rejected"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
+    # Distinct from REJECTED on purpose — REJECTED is a PMO intake-time decision (a proposal never
+    # got accepted in the first place). CANCELLED is what happens to a project PMO already accepted,
+    # stopped later — typically because a post-acceptance update (§7.2, Agent 11/12) revealed it's
+    # slipping on timeline/cost/risk badly enough that continuing isn't worth it. Conflating the two
+    # would make an accepted-then-cancelled project look identical to one that was never approved,
+    # which loses real information a PMO reviewing the portfolio needs.
+    CANCELLED = "cancelled"
 
 class RiskCategory(str, Enum):
     REGULATORY = "regulatory"
@@ -39,10 +46,11 @@ ALLOWED_TRANSITIONS = {
     Status.DRAFT: {Status.PMO_REVIEW, Status.REJECTED},
     Status.PMO_REVIEW: {Status.ANALYSIS, Status.REJECTED},
     Status.ANALYSIS: {Status.ACCEPTED, Status.REJECTED, Status.PMO_REVIEW},  # back to pmo_review if flagged "review"
-    Status.ACCEPTED: {Status.IN_PROGRESS},
-    Status.IN_PROGRESS: {Status.COMPLETED},
+    Status.ACCEPTED: {Status.IN_PROGRESS, Status.CANCELLED},
+    Status.IN_PROGRESS: {Status.COMPLETED, Status.CANCELLED},
     Status.REJECTED: set(),
     Status.COMPLETED: set(),
+    Status.CANCELLED: set(),
 }
 
 @dataclass

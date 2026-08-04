@@ -14,8 +14,10 @@ from src.shared.config import RISK_RANK
 from src.db.repositories import (
     mark_project_update_resolved, apply_project_update, insert_change_request,
     write_audit_log, write_notification, get_change_request, resolve_change_request,
+    get_project_by_ref, update_status,
 )
-from src.notifications.templates import change_auto_applied, change_authorized, change_declined
+from src.orchestration.state_machine import transition
+from src.notifications.templates import change_auto_applied, change_authorized, change_declined, change_cancelled
 
 # The three axes the requested rule actually names — "earlier timeline, lesser expenses, reduced
 # risk." schedule_status/resource_indicator are also in Agent 11's UPDATABLE_FIELDS (§7.2.1) but are
@@ -135,11 +137,17 @@ def process_update(conn, update_entry: dict, project_name: str, requested_by=Non
 def resolve_gate3(conn, change_request_id, decision, project_name, pmo_comment="", resolved_by="PMO"):
     """
     §7.2.2's Gate 3 resolution — the human decision Agent 12 was waiting on. `decision` is
-    'accept'/'reject'. On accept, applies the exact after_state Agent 11 originally captured (Agent
-    12 never re-derives it) and marks the underlying project_updates row applied. Same
-    hard-not-bypassable-by-an-agent rule as Gates 1/2 (§8.2 guardrail 3) — this function only runs
-    once a real PMO decision has been made; nothing calls it automatically.
+    'accept'/'reject'/'cancel'. On accept, applies the exact after_state Agent 11 originally captured
+    (Agent 12 never re-derives it) and marks the underlying project_updates row applied. On cancel,
+    the proposed update itself is NOT applied (same as reject — the specific field changes never take
+    effect), but the project's own status transitions to 'cancelled' — a real, distinct governance
+    outcome (§ schemas.py's Status.CANCELLED docstring) for when the update PMO was reviewing reveals
+    the project is slipping badly enough that continuing isn't worth it, not just this one change.
+    Same hard-not-bypassable-by-an-agent rule as Gates 1/2 (§8.2 guardrail 3) — this function only
+    runs once a real PMO decision has been made; nothing calls it automatically.
     """
+    if decision not in ("accept", "reject", "cancel"):
+        raise ValueError(f"decision must be accept, reject, or cancel (got {decision!r})")
     cr = get_change_request(conn, change_request_id)
     if cr is None:
         raise ValueError(f"Unknown change_request_id: {change_request_id}")
@@ -160,14 +168,33 @@ def resolve_gate3(conn, change_request_id, decision, project_name, pmo_comment="
         write_audit_log(conn, project_id, "agent12_change_evaluator", "gate3_approved",
                          {"change_request_id": change_request_id, "after_state": after_state}, 0)
         notif = change_authorized(project_name, project_id, after_state, pmo_comment)
-    else:
+        status = "approved"
+    elif decision == "reject":
         resolve_change_request(conn, change_request_id, "rejected", pmo_comment, resolved_by)
         write_audit_log(conn, project_id, "agent12_change_evaluator", "gate3_rejected",
                          {"change_request_id": change_request_id, "reason": pmo_comment}, 0)
         notif = change_declined(project_name, project_id, cr["reason"], pmo_comment)
+        status = "rejected"
+    else:  # cancel
+        # The proposed update itself never applies (same non-effect as reject) — what's different is
+        # the PROJECT's own status, which moves to cancelled. get_project_by_ref/update_status work
+        # off submission_id, not project_id (see complete_project()'s identical pattern in
+        # scripts/demo_engine.py), so resolve the real row first rather than assuming they're the
+        # same string.
+        row = get_project_by_ref(conn, project_id)
+        if row is None:
+            raise ValueError(f"Unknown project '{project_id}' — cannot cancel.")
+        new_status = transition(row["status"], "cancelled")
+        update_status(conn, row["submission_id"], new_status)
+        apply_project_update(conn, project_id, {"rejection_reason": f"Cancelled by PMO at Gate 3 — {cr['reason']}"})
+        resolve_change_request(conn, change_request_id, "rejected", pmo_comment, resolved_by)
+        write_audit_log(conn, project_id, "agent12_change_evaluator", "gate3_cancelled",
+                         {"change_request_id": change_request_id, "reason": cr["reason"]}, 0)
+        notif = change_cancelled(project_name, project_id, cr["reason"], pmo_comment)
+        status = "cancelled"
 
     recipient = cr["requested_by"] or "Project team"
     write_notification(conn, project_id, recipient, "email",
                         notif["subject"], notif["body"], trigger_agent="agent12_change_evaluator")
-    return {"status": "approved" if decision == "accept" else "rejected", "project_id": project_id,
+    return {"status": status, "project_id": project_id,
             "notification": {**notif, "recipient": recipient, "channel": "email"}}

@@ -38,6 +38,7 @@ from demo_engine import (
     submit_project_update, resolve_gate3_decision, CHANGE_DEMO_PAYLOADS, CHANGE_CASE_EMAILS,
     complete_project, run_batch_case, review_queued_project, override_queued_project, open_batch,
     close_batch, render_gate2_queue, submit_freeform, FREEFORM_BODY_PLACEHOLDER,
+    submit_project_update_freeform, reset_demo,
 )
 # Note: run_batch_case/review_queued_project/override_queued_project/open_batch/close_batch and
 # their /batch/, /queue/* HTTP routes below are kept fully wired even though the "Periodic Gate 2
@@ -77,7 +78,9 @@ body{font-family:-apple-system,Helvetica,Arial,sans-serif;color:#1a1a1a}
 #toolbar a:hover{background:#e6f1fb}
 #middle iframe{flex:1;border:none;width:100%}
 #right{width:340px;flex-shrink:0;background:#fafaf8;display:flex;flex-direction:column}
-#right h3{font-size:13px;margin:0;padding:12px 14px;border-bottom:1px solid #e5e3dc;background:#fff}
+#right h3{font-size:13px;margin:0;padding:12px 14px;border-bottom:1px solid #e5e3dc;background:#fff;display:flex;align-items:center;justify-content:space-between}
+#revert-btn{background:#f1efe8;color:#5f5e5a;border:1px solid #ddd;border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer}
+#revert-btn:hover{background:#e5e3dc;color:#1a1a1a}
 .resizer{width:6px;flex-shrink:0;cursor:col-resize;background:#e5e3dc;position:relative;transition:background .15s}
 .resizer:hover,.resizer.active{background:#378ADD}
 .resizer::after{content:'';position:absolute;top:0;bottom:0;left:-3px;right:-3px}
@@ -240,7 +243,11 @@ response in demo mode (no ANTHROPIC_API_KEY); set that env var and they judge it
   </div>
   <div class="resizer" id="resize-right" title="Drag to resize"></div>
   <div id="right">
-    <h3>📧 Notifications</h3>
+    <h3>📧 Notifications
+      <form method="POST" action="/reset" target="_top" style="margin:0" onsubmit="return confirm('Revert the demo? This wipes and reseeds the database and clears everything run so far.');">
+        <button type="submit" id="revert-btn">↺ Revert back</button>
+      </form>
+    </h3>
     <div id="decision-area"></div>
     <div id="notif-feed"><div class="empty">Nothing sent yet — run a case and this fills in as the flow reaches each notification step.</div></div>
   </div>
@@ -448,6 +455,33 @@ class Handler(BaseHTTPRequestHandler):
                 self._redirect(f"/dashboard/visualizer_{result['result_id']}.html")
             return
 
+        if parsed.path == "/project-update/submit":
+            # "The list is an interactive database" — topline.html's own compose panel (dashboard/
+            # render_topline.py), a real update against whichever accepted/in_progress project was
+            # picked. Normal form POST + redirect, same as /change/ — this form has no target=, so
+            # it's submitted from and returns straight to topline.html's own iframe (#middle-frame),
+            # not routed through the left panel at all.
+            form = self._read_form_body()
+            result = submit_project_update_freeform(
+                form.get("project_ref", ""), form.get("from", ""), form.get("subject", ""), form.get("body", ""),
+            )
+            if "error" in result:
+                self._send_html(f"<h3>{html.escape(result['error'])}</h3><p><a href='/dashboard/topline.html' target='_top'>Back to dashboard</a></p>", 400)
+                return
+            self._redirect(result["redirect"])
+            return
+
+        if parsed.path == "/reset":
+            # "Revert back" (top-right of the right panel) — wipes and reseeds the DB, clears this
+            # server's in-memory PENDING/RESOLVED decision state, and regenerates every dashboard
+            # page back to its pristine post-seed state, so a demo can restart clean without
+            # restarting the actual server process.
+            reset_demo()
+            PENDING.clear()
+            RESOLVED.clear()
+            self._redirect("/")
+            return
+
         if parsed.path.startswith("/gate2/"):
             # Called via fetch() from the small decision iframe embedded in the right panel
             # (dashboard/render_gate2.py), not a normal form navigation — so this returns JSON
@@ -605,8 +639,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": "bad request"}, 400)
                 return
             change_request_id, decision = rest.split("/", 1)
-            if decision not in ("accept", "reject"):
-                self._send_json({"error": "decision must be accept or reject"}, 400)
+            if decision not in ("accept", "reject", "cancel"):
+                self._send_json({"error": "decision must be accept, reject, or cancel"}, 400)
                 return
             try:
                 change_request_id = int(change_request_id)
