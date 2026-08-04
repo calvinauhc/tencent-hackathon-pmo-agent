@@ -22,7 +22,7 @@ No API key is required to run or test this build — it runs in mock mode automa
 ./run_all_tests.sh
 ```
 
-Runs all 12 phase test files in order (`tests/scenarios/`, `tests/eval/`) and prints pass/fail counts. 184 checks total, covering agents, the state machine, guardrails, the full pipeline across all 10 named scenarios (7 original + 3 batch-queue cases), the post-acceptance change-management/OPL loop, the periodic Gate 2 review queue, the dashboard/visualizer/comment panel, and the composer's freeform "compose your own" submission path. To run one phase at a time:
+Runs all 12 phase test files in order (`tests/scenarios/`, `tests/eval/`) and prints pass/fail counts. 189 checks total, covering agents, the state machine, guardrails, the full pipeline across all 10 named scenarios (7 original + 3 batch-queue cases), the post-acceptance change-management/OPL loop, the periodic Gate 2 review queue (now embedded on the topline dashboard), the dashboard/visualizer/comment panel, the topline's metric cards/distribution panels/sortable table, and the composer's freeform "compose your own" submission path. To run one phase at a time:
 
 ```
 python3 tests/scenarios/test_phase1.py
@@ -46,14 +46,18 @@ python3 scripts/demo_server.py
 ```
 
 Starts a local-only server and prints `http://127.0.0.1:8765`. Open that in a browser — the left
-panel is a dropdown covering the 7 named scenarios (predrafted submission emails, real trial data,
-phrased the way a submitter would write it) plus change management and periodic Gate 2 review.
-Picking one shows its preview and a "Run this case" button; clicking it sends that submission
-through the real agent pipeline live, then drops you straight onto the execution visualizer for the
-result. Below the dropdown, a "compose your own" box (From/Subject/Body) runs genuinely typed text
-through the same real pipeline via Agent 1's actual parser — see "Mock mode" below for what's
-genuinely live versus mocked in that path. Every dashboard page has a "← Composer" link back to the
-landing page so you can run another case. Stop the server with Ctrl+C when you're done.
+panel is a dropdown covering 10 cases: the 7 named scenarios (predrafted submission emails, real
+trial data, phrased the way a submitter would write it) plus Case 8/9/10 — post-acceptance change
+management (Agents 11/12, one action per case: favorable auto-apply, unfavorable → Gate 3) and
+project completion (Agent 13's OPL). Picking one shows its preview and a "Run this case" button;
+clicking it sends that submission through the real agent pipeline live, then drops you straight onto
+the execution visualizer for the result. Below the dropdown, a "compose your own" box
+(From/Subject/Body) runs genuinely typed text through the same real pipeline via Agent 1's actual
+parser — see "Mock mode" below for what's genuinely live versus mocked in that path. The portfolio
+dashboard (`dashboard/topline.html`) embeds §5.3's Periodic Gate 2 Review queue directly — Open/Close
+batch and Review/Override are real buttons there now, not a separate composer entry. Every dashboard
+page has a "← Composer" link back to the landing page so you can run another case. Stop the server
+with Ctrl+C when you're done.
 
 ## Seeing the actual system run — from the terminal
 
@@ -64,7 +68,7 @@ python3 scripts/run_demo.py 6_change_request_stakeholder_flag
 Same underlying engine as the browser composer (`scripts/demo_engine.py`), just triggered from the
 command line instead of a click. Seeds the database with all 20 trial projects (`data/trial-projects.json`), runs the chosen scenario through the real pipeline, and renders the dashboard, visualizer, and comment panel from the result. Then open in a browser (double-click from Finder, or drag into a browser tab):
 
-- `dashboard/topline.html` — portfolio dashboard: metric cards, risk mix, needs-attention panel, project table
+- `dashboard/topline.html` — portfolio dashboard: metric cards (Total Projects, Portfolio value, Approved rate, Avg success likelihood), Status + Strategic Alignment distribution panels, risk mix, needs-attention panel, the embedded Periodic Gate 2 Review queue (§5.3), and a sortable project table (click any column header)
 - `dashboard/visualizer_PRJ-2026-0842.html` — the 1-10 agent pipeline as a graph (boxes, gate diamonds, terminal outcomes), replaying the real path this submission took at 5 seconds/step (readable pace, not a race), with a live execution log and a Replay button
 - `dashboard/comments_PRJ-2026-0842.html` — comment panel, showing the PMO-vs-stakeholder permission split
 - `dashboard/notifications_PRJ-2026-0842.html` — every notification actually sent for this project: registration, acceptance/rejection + reason, and the Agent 10 success forecast
@@ -106,5 +110,5 @@ All three came out of a deliberate comparison against a teammate's repo (the fir
 - `src/` — agents, orchestration (state machine, guardrails), db, notifications, LLM client (`src/llm/client.py` for text, `src/llm/embeddings.py` for the optional real-embeddings backend)
 - `scripts/demo_engine.py` — shared logic for running a scenario (seeding, pipeline, rendering); `demo_server.py` (browser composer) and `run_demo.py` (CLI) both call into it
 - `dashboard/` — rendered HTML output (topline, visualizer, comments, notifications, activity feed)
-- `tests/` — the 184 acceptance checks across all 12 build phases
+- `tests/` — the 189 acceptance checks across all 12 build phases
 - `docs/comparing-foos-repo.md` — the teammate-repo comparison this session's upversion came from: what was adopted, what was deliberately skipped, and the exact rollback plan

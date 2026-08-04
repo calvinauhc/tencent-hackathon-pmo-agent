@@ -37,8 +37,15 @@ from demo_engine import (
     run_scenario_to_gate2, resume_scenario, SCENARIO_ORDER, SCENARIO_META, SCENARIO_EMAILS,
     submit_project_update, resolve_gate3_decision, CHANGE_DEMO_PAYLOADS, complete_project,
     run_batch_case, review_queued_project, override_queued_project, open_batch, close_batch,
-    BATCH_CASE_META, render_gate2_queue, submit_freeform, FREEFORM_BODY_PLACEHOLDER,
+    render_gate2_queue, submit_freeform, FREEFORM_BODY_PLACEHOLDER,
 )
+# Note: run_batch_case/review_queued_project/override_queued_project/open_batch/close_batch and
+# their /batch/, /queue/* HTTP routes below are kept fully wired even though the "Periodic Gate 2
+# Review" left-panel dropdown entry that used to trigger cases 8a/8b/9/10 by button is gone (per an
+# explicit ask to move to "the real queue view" instead of demo-seed buttons) — the embedded queue
+# now on topline.html (dashboard/render_topline.py) POSTs to these exact same routes for its own
+# Open batch / Close batch / Review & decide / Pull from queue controls, so none of this backend
+# logic became dead code, only its old one-click seed buttons did.
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DASHBOARD_DIR = os.path.join(REPO_ROOT, "dashboard")
@@ -130,52 +137,62 @@ def render_landing():
 </div>
 </div>""")
 
-    options.append('<option value="change">Change management (Agents 11/12)</option>')
-    panels.append(f"""
-<div class="action-panel" id="panel-change">
+    # Cases 8/9/10 — post-acceptance change management (Agents 11/12) and completion (Agent 13),
+    # each narrowed to a single action per dropdown entry so they match cases 1-7's one-case,
+    # one-outcome pattern instead of a single card with three competing buttons. All three still run
+    # against Case 1's already-accepted project (PRJ-2026-0791) — nothing about the underlying
+    # actions changed, only how they're exposed in the left panel.
+    options.append('<option value="case8">Case 8 — Project update to increase launch date</option>')
+    panels.append("""
+<div class="action-panel" id="panel-case8">
 <div class="case" style="border-color:#dceafa">
-  <div class="head" style="background:#e6f1fb"><span class="title">Post-acceptance change management (Agents 11/12)</span>
-  <span class="outcome">Runs against Case 1's already-accepted project (PRJ-2026-0791)</span></div>
+  <div class="head" style="background:#e6f1fb"><span class="title">Case 8 — Project update to increase launch date</span>
+  <span class="outcome">Expected: Agent 12 applies it immediately, no PMO gate</span></div>
   <div class="mail" style="max-height:none">
-    <div class="line">Simulates the project team submitting an ongoing status update. Agent 11 logs it;
-    Agent 12 deterministically checks timeline/cost/risk and either applies it immediately or opens a
-    real Manual Gate 3 for you to authorize.</div>
+    <div class="line">Runs against Case 1's already-accepted project (PRJ-2026-0791). Simulates the
+    project team submitting a status update that pulls the launch date in and lowers CAPEX. Agent 11
+    logs it; Agent 12 deterministically checks timeline/cost/risk, finds it favorable on every axis,
+    and applies it directly.</div>
   </div>
-  <div class="runbar" style="display:flex;gap:8px;justify-content:flex-end">
-    <form method="POST" action="/change/PRJ-2026-0791/favorable" target="middle-frame">
-      <button type="submit" style="background:#639922">✓ Simulate a favorable update</button>
-    </form>
-    <form method="POST" action="/change/PRJ-2026-0791/unfavorable" target="middle-frame">
-      <button type="submit" style="background:#ef9f27">⚠ Simulate one needing PMO authorization</button>
-    </form>
-    <form method="POST" action="/complete/PRJ-2026-0791" target="middle-frame">
-      <button type="submit" style="background:#5f5e5a">📄 Complete project → generate OPL (Agent 13)</button>
-    </form>
-  </div>
+  <form class="runbar" method="POST" action="/change/PRJ-2026-0791/favorable" target="middle-frame">
+    <button type="submit">▶ Run this case</button>
+  </form>
 </div>
 </div>""")
 
-    options.append('<option value="batch">Periodic Gate 2 Review (§5.3)</option>')
-    batch_buttons = "".join(
-        f"""<form method="POST" action="/batch/{key}" target="middle-frame">
-      <button type="submit">▶ {html.escape(BATCH_CASE_META[key]['title'])}</button>
-    </form>"""
-        for key in ("8a", "8b", "9", "10")
-    )
-    panels.append(f"""
-<div class="action-panel" id="panel-batch">
+    options.append('<option value="case9">Case 9 — Project update needing PMO authorization</option>')
+    panels.append("""
+<div class="action-panel" id="panel-case9">
 <div class="case" style="border-color:#dceafa">
-  <div class="head" style="background:#e6f1fb"><span class="title">Periodic Gate 2 Review (§5.3)</span>
-  <span class="outcome">Weekly batch queue, budget rollup, fast-track + override exceptions</span></div>
+  <div class="head" style="background:#e6f1fb"><span class="title">Case 9 — Project update needing PMO authorization</span>
+  <span class="outcome">Expected: Agent 12 escalates to Manual Gate 3</span></div>
   <div class="mail" style="max-height:none">
-    <div class="line">Cases 8a/8b land in the same queue, competing for Southeast Asia's CAPEX budget.
-    Case 9 (under $50K) skips the queue automatically. Case 10 waits in the queue until pulled out
-    with a logged override reason. Open <a href="/dashboard/gate2_queue.html" target="middle-frame">the
-    queue page</a> any time to see what's currently waiting.</div>
+    <div class="line">Runs against Case 1's already-accepted project (PRJ-2026-0791). Simulates a
+    status update where integration scope grew — CAPEX rises and a new risk is flagged. Agent 12
+    finds it regresses on risk, so it doesn't auto-apply; a real Manual Gate 3 opens for you to
+    authorize or decline.</div>
   </div>
-  <div class="runbar" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
-    {batch_buttons}
+  <form class="runbar" method="POST" action="/change/PRJ-2026-0791/unfavorable" target="middle-frame">
+    <button type="submit">▶ Run this case</button>
+  </form>
+</div>
+</div>""")
+
+    options.append('<option value="case10">Case 10 — Complete project, generate OPL (Agent 13)</option>')
+    panels.append("""
+<div class="action-panel" id="panel-case10">
+<div class="case" style="border-color:#dceafa">
+  <div class="head" style="background:#e6f1fb"><span class="title">Case 10 — Complete project, generate OPL (Agent 13)</span>
+  <span class="outcome">Expected: Project marked completed, OPL composed and published</span></div>
+  <div class="mail" style="max-height:none">
+    <div class="line">Runs against Case 1's already-accepted project (PRJ-2026-0791). Moves it through
+    in_progress to completed and has Agent 13 compose an Operational Learnings Package citing its
+    real update/change-request history — richest if Cases 8 and 9 already ran, but works standalone
+    too.</div>
   </div>
+  <form class="runbar" method="POST" action="/complete/PRJ-2026-0791" target="middle-frame">
+    <button type="submit">▶ Run this case</button>
+  </form>
 </div>
 </div>""")
 
@@ -218,7 +235,6 @@ response in demo mode (no ANTHROPIC_API_KEY); set that env var and they judge it
       <span>Jump to:</span>
       <a href="/dashboard/topline.html" target="middle-frame">🏠 Portfolio Dashboard</a>
       <a href="/dashboard/activity.html" target="middle-frame">📋 Activity Feed</a>
-      <a href="/dashboard/gate2_queue.html" target="middle-frame">🗂 Gate 2 Queue</a>
     </div>
     <iframe name="middle-frame" id="middle-frame" src="/dashboard/topline.html"></iframe>
   </div>
