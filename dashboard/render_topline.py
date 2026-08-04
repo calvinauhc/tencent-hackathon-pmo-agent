@@ -123,7 +123,7 @@ def render():
         # clicking a project should go straight from "what's the portfolio look like" to "what is
         # this specific project doing right now" in one click). But only ONE project gets a fresh
         # visualizer_*.html per demo run (scripts/demo_engine.py renders just the scenario that was
-        # actually run, not all 100 trial rows) — linking every row unconditionally would 404 for
+        # actually run, not every trial row) — linking every row unconditionally would 404 for
         # every project except that one, so only link when the file genuinely exists on disk.
         link_id = r["project_id"] or r["submission_id"]
         vis_path = os.path.join(dashboard_dir, f"visualizer_{link_id}.html")

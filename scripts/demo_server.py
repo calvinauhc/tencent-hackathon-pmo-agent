@@ -37,7 +37,7 @@ from demo_engine import (
     run_scenario_to_gate2, resume_scenario, SCENARIO_ORDER, SCENARIO_META, SCENARIO_EMAILS,
     submit_project_update, resolve_gate3_decision, CHANGE_DEMO_PAYLOADS, complete_project,
     run_batch_case, review_queued_project, override_queued_project, open_batch, close_batch,
-    BATCH_CASE_META, render_gate2_queue,
+    BATCH_CASE_META, render_gate2_queue, submit_freeform, FREEFORM_BODY_PLACEHOLDER,
 )
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -95,14 +95,27 @@ body{font-family:-apple-system,Helvetica,Arial,sans-serif;color:#1a1a1a}
 .runbar{padding:8px 12px;border-top:1px solid #eee;text-align:right}
 button{background:#378ADD;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer}
 button:hover{background:#2c6fb3}
+#action-select{width:100%;padding:8px 10px;font-size:13px;border:1px solid #e5e3dc;border-radius:6px;margin-bottom:12px;background:#fff}
+.action-panel{display:none}
+.action-panel.active{display:block}
+.divider{display:flex;align-items:center;gap:10px;margin:20px 0 14px}
+.divider .line{flex:1;height:1px;background:#e5e3dc}
+.divider span{font-size:11px;color:#999}
+#compose{border:1px solid #e5e3dc;border-radius:10px;padding:10px 12px;background:#fff}
+#compose label{font-size:11px;color:#5f5e5a;display:block;margin-bottom:3px}
+#compose input,#compose textarea{width:100%;font-size:12px;font-family:inherit;padding:6px 8px;border:1px solid #e5e3dc;border-radius:6px;margin-bottom:10px;box-sizing:border-box}
+#compose textarea{height:120px;resize:vertical}
 """
 
 def render_landing():
-    cards = []
+    options = []
+    panels = []
     for i, key in enumerate(SCENARIO_ORDER, start=1):
         meta = SCENARIO_META[key]
         email = SCENARIO_EMAILS[key]
-        cards.append(f"""
+        options.append(f'<option value="{key}">Case {i} — {html.escape(meta["title"])}</option>')
+        panels.append(f"""
+<div class="action-panel{' active' if i == 1 else ''}" id="panel-{key}">
 <div class="case">
   <div class="head"><span class="title">Case {i} — {html.escape(meta['title'])}</span>
   <span class="outcome">{html.escape(meta['outcome'])}</span></div>
@@ -114,8 +127,12 @@ def render_landing():
   <form class="runbar" method="POST" action="/run/{key}" target="middle-frame">
     <button type="submit">▶ Run this case</button>
   </form>
+</div>
 </div>""")
-    change_section = f"""
+
+    options.append('<option value="change">Change management (Agents 11/12)</option>')
+    panels.append(f"""
+<div class="action-panel" id="panel-change">
 <div class="case" style="border-color:#dceafa">
   <div class="head" style="background:#e6f1fb"><span class="title">Post-acceptance change management (Agents 11/12)</span>
   <span class="outcome">Runs against Case 1's already-accepted project (PRJ-2026-0791)</span></div>
@@ -135,14 +152,18 @@ def render_landing():
       <button type="submit" style="background:#5f5e5a">📄 Complete project → generate OPL (Agent 13)</button>
     </form>
   </div>
-</div>"""
+</div>
+</div>""")
+
+    options.append('<option value="batch">Periodic Gate 2 Review (§5.3)</option>')
     batch_buttons = "".join(
         f"""<form method="POST" action="/batch/{key}" target="middle-frame">
       <button type="submit">▶ {html.escape(BATCH_CASE_META[key]['title'])}</button>
     </form>"""
         for key in ("8a", "8b", "9", "10")
     )
-    batch_section = f"""
+    panels.append(f"""
+<div class="action-panel" id="panel-batch">
 <div class="case" style="border-color:#dceafa">
   <div class="head" style="background:#e6f1fb"><span class="title">Periodic Gate 2 Review (§5.3)</span>
   <span class="outcome">Weekly batch queue, budget rollup, fast-track + override exceptions</span></div>
@@ -155,18 +176,41 @@ def render_landing():
   <div class="runbar" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
     {batch_buttons}
   </div>
-</div>"""
+</div>
+</div>""")
+
+    compose_section = f"""
+<div class="divider"><div class="line"></div><span>or submit your own</span><div class="line"></div></div>
+<div id="compose">
+  <form method="POST" action="/submit" target="middle-frame">
+    <label for="c-from">From</label>
+    <input id="c-from" name="from" type="text" placeholder="name@company.com" />
+    <label for="c-subject">Subject</label>
+    <input id="c-subject" name="subject" type="text" placeholder="Proposal — project name" />
+    <label for="c-body">Body</label>
+    <textarea id="c-body" name="body" placeholder="{html.escape(FREEFORM_BODY_PLACEHOLDER)}"></textarea>
+    <div class="runbar" style="padding:0;border-top:none">
+      <button type="submit">✉ Submit for review</button>
+    </div>
+  </form>
+</div>
+<div class="sub" style="margin-top:8px">Runs through the real pipeline — Agent 1 parses whatever's
+typed (deterministic fallback in demo mode, so it works best matching the placeholder's shape), Agent
+2 checks it against the real seeded trial projects for duplicates. Agent 5/6 use one generic mock
+response in demo mode (no ANTHROPIC_API_KEY); set that env var and they judge it for real too.</div>"""
+
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>PMO Intake — Composer</title>
 <style>{PAGE_CSS}</style></head><body>
 <div id="app">
   <div id="left">
     <h2>PMO Project Intake — composer</h2>
-    <div class="sub">Click "Run this case" to send it through the real agent pipeline. Middle panel
-    shows the flow — Gate 2 review if a PMO decision is needed, then the live execution graph.
-    Right panel fills in with each notification the instant its step fires during replay.</div>
-    {"".join(cards)}
-    {change_section}
-    {batch_section}
+    <div class="sub">Choose a case, or compose your own below, then run it through the real agent
+    pipeline. Middle panel shows the flow — Gate 2 review if a PMO decision is needed, then the live
+    execution graph. Right panel fills in with each notification the instant its step fires during
+    replay.</div>
+    <select id="action-select">{"".join(options)}</select>
+    {"".join(panels)}
+    {compose_section}
   </div>
   <div class="resizer" id="resize-left" title="Drag to resize"></div>
   <div id="middle">
@@ -266,6 +310,15 @@ document.getElementById('middle-frame').addEventListener('load', function() {{ c
   makeResizable(document.getElementById('resize-left'), leftPanel, 'left', 'pmo_composer_left_width', 240, 720);
   makeResizable(document.getElementById('resize-right'), rightPanel, 'right', 'pmo_composer_right_width', 240, 720);
 }})();
+
+// Dropdown swaps which panel is visible — purely client-side, every underlying form/route below
+// is untouched, so this is just a view toggle over the exact same actions that used to be all
+// stacked and always visible.
+document.getElementById('action-select').addEventListener('change', function(e) {{
+  document.querySelectorAll('.action-panel').forEach(function(p) {{ p.classList.remove('active'); }});
+  var panel = document.getElementById('panel-' + e.target.value);
+  if (panel) panel.classList.add('active');
+}});
 </script>
 </body></html>"""
 
@@ -355,6 +408,24 @@ class Handler(BaseHTTPRequestHandler):
                 RESOLVED.pop(result["submission_id"], None)
                 PENDING[result["submission_id"]] = {
                     "project": result["project"], "trace": result["trace"], "scenario_key": key,
+                }
+                self._redirect(f"/dashboard/visualizer_{result['visualizer_id']}.html")
+            else:
+                self._redirect(f"/dashboard/visualizer_{result['result_id']}.html")
+            return
+
+        if parsed.path == "/submit":
+            # "Compose your own" (§12.1) — same PENDING/RESOLVED contract as /run/<key>, just
+            # sourced from typed From/Subject/Body instead of a named scenario key. See
+            # demo_engine.submit_freeform()'s docstring for what's genuinely live here (Agent 1
+            # parse, Agent 2 duplicate check) versus generically mocked (Agent 5/6, absent a real
+            # ANTHROPIC_API_KEY).
+            form = self._read_form_body()
+            result = submit_freeform(form.get("from", ""), form.get("subject", ""), form.get("body", ""))
+            if result["status"] == "pending_gate2":
+                RESOLVED.pop(result["submission_id"], None)
+                PENDING[result["submission_id"]] = {
+                    "project": result["project"], "trace": result["trace"], "scenario_key": None,
                 }
                 self._redirect(f"/dashboard/visualizer_{result['visualizer_id']}.html")
             else:

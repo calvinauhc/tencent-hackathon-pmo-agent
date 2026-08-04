@@ -24,7 +24,7 @@ Status legend: [x] ready · [ ] needs a human to do it — nothing here is fake-
 
 - `TECH-SPEC.md` — full architecture, judged against all four scoring dimensions (§1).
 - `BUILD-TASKS.md` — 6 phases, all checked off against real passing tests (see below).
-- `data/` — 100 synthetic trial projects + Playbook, PVP, political, and regulatory docs.
+- `data/` — 20 curated synthetic trial projects (reduced from a heavily-templated 100 — see TECH-SPEC.md §14) + Playbook, PVP, political, and regulatory docs.
 - `src/` — working agents (1, 2, 5, 6, 7, 8, 10, 7.1), state machine, guardrails, audit log — all covered by `tests/`.
 - `dashboard/` — topline dashboard, replay visualizer, comment panel, all rendering from real pipeline output, not mockups.
 - `DEMO-TRANSCRIPT.md` — the real shot list for the required video, generated from an actual run.

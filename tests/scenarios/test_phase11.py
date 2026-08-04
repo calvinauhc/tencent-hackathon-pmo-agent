@@ -102,8 +102,12 @@ sims = agent2._real_embedding_similarities("some new project text", ["some exist
 check("11.3 _real_embedding_similarities returns None with the flag unset", sims is None, sims)
 
 # --- 11.4 find_closest_match still works end-to-end via the TF-IDF fallback (unchanged behavior) ---
-existing = [p for p in projects if p.status in ("accepted", "in_progress", "completed")][:5]
 target = by_id["SUB-0001"]
+# Excludes the target itself, same convention every real call site (demo_engine.py, pipeline.py)
+# already follows — comparing a project against itself is a degenerate case (score == 1.0, or
+# fractionally over 1.0 from float rounding), not what this check is testing.
+existing = [p for p in projects if p.status in ("accepted", "in_progress", "completed")
+            and p.submission_id != target.submission_id][:5]
 match, score = agent2.find_closest_match(target, existing)
 check("11.4 find_closest_match returns a real result via TF-IDF fallback", match is not None and 0.0 <= score <= 1.0, (match.project_id if match else None, score))
 
