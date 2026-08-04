@@ -9,7 +9,7 @@ data/trial-projects.json's scenario_index (§12), phrased as a real submitter wo
 from that scenario's real trial-data fields (not fabricated). This is what the composer landing
 page (dashboard's entry point, §12.1) shows and lets you click to run.
 """
-import sys, os, json
+import sys, os, json, time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from src.db.client import get_connection
 from src.db.repositories import (
@@ -21,6 +21,7 @@ from src.shared.schemas import Project
 from src.shared.config import GATE2_FAST_TRACK_CAPEX_USD
 from src.db.trial_loader import load_trial_data
 from src.orchestration.pipeline import run_submission, run_intake_to_gate2, resume_after_gate2
+from src.agents.agent1_intake_parser import parse_intake
 from src.orchestration.state_machine import transition
 from src.agents.agent11_update_logger import log_update
 from src.agents.agent12_change_evaluator import process_update, resolve_gate3
@@ -646,3 +647,78 @@ def close_batch(batch_id):
     close_gate2_batch(conn, batch_id)
     render_gate2_queue()
     return {"redirect": "/dashboard/gate2_queue.html"}
+
+
+# --- Freeform "compose your own" submission (§12.1 composer, "comparing Foo's repo" upversion) ---
+# Same real pipeline as the 7 named cases, but starting from raw From/Subject/Body text a person
+# actually typed instead of a predrafted trial-data anchor. Uses Agent 1's parse_intake() — the
+# genuine "parse raw text" entry point (src/agents/agent1_intake_parser.py), which the named-case
+# path never needed because trial data arrives pre-structured. In MOCK_MODE (no ANTHROPIC_API_KEY,
+# the demo default) parse_intake() falls back to its deterministic regex extractor rather than
+# raising, so a submission whose fields don't match the expected email shape (see the compose box's
+# placeholder template) comes back with those fields genuinely None — which then correctly routes
+# through the same "incomplete information" rejection Case 5 demonstrates, not a crash.
+#
+# Agent 5/6 have no deterministic fallback of their own (only Agent 1 does — see that module's
+# docstring), so a freeform run in MOCK_MODE uses one generic, always-the-same mock response for
+# them (FREEFORM_MOCKS below) rather than content tailored to what was typed. Agent 1 (parsing) and
+# Agent 2 (duplicate check against the real 100 trial projects) still genuinely respond to the
+# input — those are the two steps a novel submission actually exercises differently case to case.
+# Set a real ANTHROPIC_API_KEY (see README's Mock mode section) and Agent 5/6 go live automatically,
+# same as every other agent call in this codebase — nothing here special-cases that switch.
+FREEFORM_MOCKS = {
+    "agent5": {"margin_impact": "unclear", "citation": "New initiatives are expected to demonstrate a credible path to at least 15% margin within 18 months of launch"},
+    "agent6": {"verdict": "aligned", "citation": "AI-enabled operational tooling, supply chain digitization, customer-facing automation"},
+}
+
+FREEFORM_BODY_PLACEHOLDER = (
+    "Objective: <the problem, one sentence>\n"
+    "Proposed solution: <what you're proposing>\n\n"
+    "Estimated business impact: $<amount>. Estimated CAPEX: $<amount>.\n"
+    "Risk: <biggest known risk, or \"No significant risk identified at this stage\">\n\n"
+    "Team: <names> — <department>, <region>."
+)
+
+def submit_freeform(from_field, subject, body):
+    """Runs a real, typed submission through the actual pipeline. Returns the same
+    status/"pending_gate2" vs "terminal" shape as run_scenario_to_gate2(), so the server route
+    handles it identically to a named case."""
+    raw_text = f"From: {from_field}\nSubject: {subject}\n\n{body}"
+    parsed, _ms = parse_intake(raw_text)
+    fields = parsed["parsed_fields"]
+
+    conn = get_connection()
+    _ensure_seeded(conn, "SUB-0001")  # real "existing" projects for Agent 2 to compare against
+
+    submission_id = f"SUB-FREE-{int(time.time() * 1000) % 10_000_000}"
+    project = Project(
+        submission_id=submission_id,
+        submitter_name=fields.get("submitter_name"),
+        team_members=fields.get("team_members") or [],
+        objective=fields.get("objective"),
+        project_name=fields.get("project_name") or (subject.strip() or None),
+        solution=fields.get("solution"),
+        business_impact_usd=fields.get("business_impact_usd"),
+        capex_usd=fields.get("capex_usd"),
+        hypothesis_risk=fields.get("hypothesis_risk"),
+    )
+
+    trial_projects, _idx = load_trial_data()
+    existing = [p for p in trial_projects if p.status in ("accepted", "in_progress", "completed")]
+    trace = run_intake_to_gate2(conn, project, existing, FREEFORM_MOCKS)
+
+    if trace.get("final_status") == "pending_gate2":
+        gate2_file = f"gate2_{submission_id}.html"
+        render_gate2(submission_id, project, trace)
+        visualizer_id = _result_id(project, trace)
+        v_path, v_steps = render_visualizer(visualizer_id, redirect_to=gate2_file)
+        return {
+            "status": "pending_gate2", "submission_id": submission_id, "visualizer_id": visualizer_id,
+            "scenario_key": None, "project": project, "trace": trace,
+            "paths": {"visualizer": v_path},
+        }
+
+    result_id = _result_id(project, trace)
+    rendered = _render_all(result_id)
+    return {"status": "terminal", "scenario_key": None, "trace": trace, "result_id": result_id,
+            "parsed_fields": fields, "incomplete_fields": parsed.get("incomplete_fields", []), **rendered}

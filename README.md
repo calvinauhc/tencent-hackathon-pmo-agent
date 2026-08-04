@@ -22,7 +22,7 @@ No API key is required to run or test this build — it runs in mock mode automa
 ./run_all_tests.sh
 ```
 
-Runs all 11 phase test files in order (`tests/scenarios/`, `tests/eval/`) and prints pass/fail counts. 159 checks total, covering agents, the state machine, guardrails, the full pipeline across all 10 named scenarios (7 original + 3 batch-queue cases), the post-acceptance change-management/OPL loop, the periodic Gate 2 review queue, and the dashboard/visualizer/comment panel. To run one phase at a time:
+Runs all 12 phase test files in order (`tests/scenarios/`, `tests/eval/`) and prints pass/fail counts. 184 checks total, covering agents, the state machine, guardrails, the full pipeline across all 10 named scenarios (7 original + 3 batch-queue cases), the post-acceptance change-management/OPL loop, the periodic Gate 2 review queue, the dashboard/visualizer/comment panel, and the composer's freeform "compose your own" submission path. To run one phase at a time:
 
 ```
 python3 tests/scenarios/test_phase1.py
@@ -36,6 +36,7 @@ python3 tests/scenarios/test_phase8.py    # Agent 13 (OPL Composer) + Agent 2/5 
 python3 tests/scenarios/test_phase9.py    # Periodic Gate 2 Review batching (§5.3)
 python3 tests/scenarios/test_phase10.py   # Gate 2 accept-comment + Hold
 python3 tests/scenarios/test_phase11.py   # "comparing Foo's repo" upversion — see below
+python3 tests/scenarios/test_phase12.py   # composer redesign: dropdown + real freeform submission
 ```
 
 ## Seeing the actual system run — in a browser (recommended)
@@ -44,11 +45,14 @@ python3 tests/scenarios/test_phase11.py   # "comparing Foo's repo" upversion —
 python3 scripts/demo_server.py
 ```
 
-Starts a local-only server and prints `http://127.0.0.1:8765`. Open that in a browser — it's a
-composer landing page with all 7 named scenarios shown as predrafted submission emails (real trial
-data, phrased the way a submitter would write it). Click "Run this case" on any of them and it
-sends that submission through the real agent pipeline live, then drops you straight onto the
-execution visualizer for the result. Every dashboard page has a "← Composer" link back to the
+Starts a local-only server and prints `http://127.0.0.1:8765`. Open that in a browser — the left
+panel is a dropdown covering the 7 named scenarios (predrafted submission emails, real trial data,
+phrased the way a submitter would write it) plus change management and periodic Gate 2 review.
+Picking one shows its preview and a "Run this case" button; clicking it sends that submission
+through the real agent pipeline live, then drops you straight onto the execution visualizer for the
+result. Below the dropdown, a "compose your own" box (From/Subject/Body) runs genuinely typed text
+through the same real pipeline via Agent 1's actual parser — see "Mock mode" below for what's
+genuinely live versus mocked in that path. Every dashboard page has a "← Composer" link back to the
 landing page so you can run another case. Stop the server with Ctrl+C when you're done.
 
 ## Seeing the actual system run — from the terminal
@@ -87,9 +91,9 @@ Two optional, additive upgrades on top of mock mode — both off by default, bot
   python3 scripts/demo_server.py
   ```
   Absent the env var, or if Ollama isn't running / times out / the model isn't pulled, Agent 2 falls straight back to TF-IDF automatically — no crash, no hang (3-second timeout by default, tunable via `OLLAMA_TIMEOUT_SECONDS`). Model is configurable via `OLLAMA_EMBED_MODEL` if you'd rather use something like `embeddinggemma` or `qwen3-embedding` (see [Ollama's embedding models](https://docs.ollama.com/capabilities/embeddings)).
-- Agent 1's intake parser now has a real deterministic fallback (`src/agents/agent1_intake_parser.py`'s `_deterministic_fallback_parse`) for genuinely unscripted input in mock mode, instead of raising an error. Nothing to configure — it only engages when no `mock_response` was supplied.
+- Agent 1's intake parser now has a real deterministic fallback (`src/agents/agent1_intake_parser.py`'s `_deterministic_fallback_parse`) for genuinely unscripted input in mock mode, instead of raising an error. Nothing to configure — it only engages when no `mock_response` was supplied. This is exactly what the composer's "compose your own" box calls live — nothing to set up beyond running the server normally.
 
-Both came out of a deliberate comparison against a teammate's repo, documented in full — what was adopted, what wasn't, and exactly how to revert — in `docs/comparing-foos-repo.md`. (The embeddings upgrade originally used a hosted API, Voyage AI, before being swapped to Ollama — same doc explains why.)
+All three came out of a deliberate comparison against a teammate's repo (the first two directly; the composer redesign is a later, related pass), documented in full — what was adopted, what wasn't, and exactly how to revert — in `docs/comparing-foos-repo.md`. (The embeddings upgrade originally used a hosted API, Voyage AI, before being swapped to Ollama — same doc explains why.)
 
 ## Project layout
 
@@ -102,5 +106,5 @@ Both came out of a deliberate comparison against a teammate's repo, documented i
 - `src/` — agents, orchestration (state machine, guardrails), db, notifications, LLM client (`src/llm/client.py` for text, `src/llm/embeddings.py` for the optional real-embeddings backend)
 - `scripts/demo_engine.py` — shared logic for running a scenario (seeding, pipeline, rendering); `demo_server.py` (browser composer) and `run_demo.py` (CLI) both call into it
 - `dashboard/` — rendered HTML output (topline, visualizer, comments, notifications, activity feed)
-- `tests/` — the 159 acceptance checks across all 11 build phases
+- `tests/` — the 184 acceptance checks across all 12 build phases
 - `docs/comparing-foos-repo.md` — the teammate-repo comparison this session's upversion came from: what was adopted, what was deliberately skipped, and the exact rollback plan

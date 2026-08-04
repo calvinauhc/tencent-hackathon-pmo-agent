@@ -13,5 +13,6 @@ echo "=== Phase 8 ===" && python3 tests/scenarios/test_phase8.py
 echo "=== Phase 9 ===" && python3 tests/scenarios/test_phase9.py
 echo "=== Phase 10 ===" && python3 tests/scenarios/test_phase10.py
 echo "=== Phase 11 ===" && python3 tests/scenarios/test_phase11.py
+echo "=== Phase 12 ===" && python3 tests/scenarios/test_phase12.py
 echo
 echo "All phases passed."

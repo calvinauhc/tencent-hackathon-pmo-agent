@@ -4,12 +4,12 @@ Haiku tier (§16). Parses raw submission text into §3 fields; missing submitter
 -> reject at intake with "incomplete information" (§10), never guessed.
 
 Note on scope: this standalone parse_intake() function is exercised directly by tests/scenarios/
-test_phase1.py against a real raw email. The live demo pipeline (src/orchestration/pipeline.py)
-does NOT call it — the composer/trial-data flow hands pipeline.run_intake_to_gate2() an
-already-structured Project object, so it only reuses Agent 1's REQUIRED_FIELDS constant for its own
-validation step, not this LLM call. parse_intake() is the real "parse actual raw text" entry point
-this is speced to be (§2) once raw email/form intake is wired up for real — the hardening below is
-for that path, not a change to what the current demo visibly does.
+test_phase1.py against a real raw email. The 7 named scenarios still bypass it — pipeline.py hands
+run_intake_to_gate2() an already-structured Project object from trial data, reusing only Agent 1's
+REQUIRED_FIELDS constant for validation, not this LLM call. But the composer's "compose your own"
+box (scripts/demo_engine.py's submit_freeform(), the left-panel dropdown redesign) DOES call this
+function for real on whatever a person actually types — the genuine "parse raw text" entry point
+this was always speced to be (§2), now genuinely reachable from the live demo, not just tests.
 
 Fallback tier ("comparing Foo's repo" upversion, docs/comparing-foos-repo.md): a teammate's repo
 (THENGFY/Transform-Office-Workflow) never crashes on unscripted input — its Agent 1 falls through

@@ -599,6 +599,8 @@ One artifact, not two. The submission video (3–5 min, required per the handboo
 
 **Entry point**: the email composer from §0's simulated-intake decision. Paste a submission (§12's scenarios are ready-made scripts) → submit → the run plays out live through §9.1's visualizer (agents activating, gates pausing for PMO input) → lands on the §9 dashboard.
 
+**Composer left panel** (added post-brief, docs/comparing-foos-repo.md): the 7 named scenarios, post-acceptance change management, and the periodic Gate 2 review cases are one dropdown (was 9 always-visible stacked cards) plus a genuine "paste a submission" compose box (From/Subject/Body) below it — the literal fulfillment of this section's "paste a submission" line above, which the original build only satisfied via predrafted cards, not free text. Runs through the real pipeline via Agent 1's `parse_intake()` (deterministic fallback in demo mode).
+
 **Sequencing**:
 1. Get composer → visualizer → dashboard stable end to end first.
 2. Screen-record one clean run once stable — this becomes both the submission video and the Pitch Day backup recording, not a separately produced piece.
