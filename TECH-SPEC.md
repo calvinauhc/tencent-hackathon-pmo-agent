@@ -781,5 +781,33 @@ Rationale for the shape: `config.ts` centralizes every `[ASSUMPTION]` threshold 
 → Risk: applying "skip LangChain" advice here (right for a simple lite pipeline) would be wrong — three manual gates and idle-between-steps state is real orchestration complexity a hand-rolled script will fight against.
 → Fix: adopt LangGraph specifically for orchestration (§8), not the broader LangChain ecosystem for everything — it's the one framework choice that matches this system's actual shape, and LangSmith tracing comes with it at near-zero extra cost.
 
+## 16.1 CodeBuddy chunked build execution plan (credit-constrained) — new, not in brief
+
+If building this from scratch directly in CodeBuddy under a fixed credit budget (e.g. the hackathon's ~1900-credit allowance), reuse `BUILD-TASKS.md`'s Phase 0–6 structure as-is rather than re-deriving a new breakdown — it's the sequence that actually built and passed all 247 tests in this repo, so the dependency ordering is already validated, not hypothetical.
+
+**Why credit tier matters more than raw token count here**: CodeBuddy's published billing docs (`codebuddy.ai/docs/ide/Account/credits`) state credit consumption scales with (a) model tier — pricier/more-capable tiers cost more per token — and (b) task complexity (short Q&A < code generation < full-file refactoring), but publish no exact per-token/per-tier conversion table. That means the controllable lever is *which tier a chunk runs on*, not trying to pre-compute a token budget that has no public exchange rate. Chunk boundaries below are drawn so each one can run on the cheapest tier its actual reasoning load requires, matching this doc's own Fast/Balanced/Primary/Deep mapping (§16's agent-strategy table) rather than running everything on one tier by default.
+
+| Phase (`BUILD-TASKS.md`) | Contents | Reasoning load | Recommended tier | Gate before advancing |
+|---|---|---|---|---|
+| 0 — Scaffolding | Repo tree, `schemas.ts`, `config.ts`, trial data loading | Pure structure, no reasoning | Fast | Types compile against 5 sample trial entries |
+| 1 — Core reasoning agents (mocked) | Agents 1/2/5/6, built and tested against fixed scenario inputs, no DB yet | The one phase where real prompts/thresholds get authored — genuine reasoning work | Primary (Deep only if a specific scenario's output quality demands it) | All acceptance criteria in `BUILD-TASKS.md` 1.1–1.6 pass **in MOCK_MODE first** (zero credit cost — this repo's deterministic-fallback pattern, §"comparing Foo's repo" upversion) before spending any real-tier credits confirming the live model agrees |
+| 2 — Data layer, state machine, guardrails | Transitions, iteration caps (§8.1), prompt-injection wrapper, output-schema enforcement, audit log | No LLM call anywhere in this phase (§16's own agent table) | Fast, or no model call at all | A project can't skip a status value; a malformed enum is rejected, not coerced |
+| 3 — Notifications and pipeline wiring | Templates (§11) + wiring Phases 1–2 together | Mechanical | Fast | All 7 named scenarios (`scenario_index`) run end to end and land on the correct final status — this is the checkpoint where a bug would otherwise compound into every later phase |
+| 4 — Dashboard/visualizer | Metric cards, visualizer, comment panel, composer entry point | High token volume (markup generation) but low reasoning complexity — translating an already-fixed layout spec (§9) into code | Balanced | Matches §9's reference layout; a red project's `help_needed` is visible with no click |
+| 5 — Extensions | §7.1 Monthly Briefing, visualizer latency display | Build last | Primary (briefing) / Fast (latency display) | First to cut if the budget is running out — see cut order below |
+| 6 — Demo/submission | Shot list, `SUBMISSION-CHECKLIST.md`, this porting doc | Templated from what already exists | Fast | Mechanical, cheap regardless of tier |
+
+Two credit-discipline rules on top of the phase table itself:
+
+→ Risk: paying real-tier credits for the back-and-forth of debugging logic that hasn't stabilized yet.
+→ Fix: build and fully green-light every phase in MOCK_MODE first (already a first-class mode in this codebase, `src/llm/client.py`'s `MOCK_MODE`/deterministic-fallback pattern) — spend real-model credits on a single final verification pass per phase, not on getting there.
+
+→ Risk: running every chunk on one default tier over- or under-spends depending on the chunk's actual reasoning load.
+→ Fix: match tier to chunk per the table above — Fast for scaffolding/wiring/templates (Phases 0/2/3/6), Primary/Deep only for Phase 1's agent-prompt authoring and Phase 5's briefing.
+
+**If the budget genuinely won't stretch to all six phases**, follow this repo's own established cut order (`BUILD-TASKS.md`'s closing note) rather than improvising a new one: 5.1 (Monthly Briefing) → 5.2 (visualizer latency display) → live-mode polling in 4.2 (keep replay-only) → §9.2's stakeholder flag path (keep the PMO decision path). **Never cut Phases 0–3** — that's the judged core (AI Innovation + Technical Excellence, §1), regardless of remaining credit.
+
+**Calibrating the estimate for real**: since no public per-token/tier credit rate card exists, treat the table above as *relative* cost ordering, not literal credit counts. Run one representative Phase-0 chunk and one representative Phase-1 chunk in CodeBuddy, check Dashboard → Usage for the actual credits consumed by each, and scale the rest of the plan from those two real data points rather than a guess.
+
 ---
 **Open items requiring a decision before coding starts:** similarity thresholds (§4), risk taxonomy completeness (§6), success-score weights (§7), dashboard role permissions (§9) — all marked [ASSUMPTION] above. Reasonable defaults are proposed so coding isn't blocked; revisit once the 100-entry trial dataset exists.
