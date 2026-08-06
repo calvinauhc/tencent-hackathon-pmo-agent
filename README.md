@@ -22,7 +22,7 @@ No API key is required to run or test this build — it runs in mock mode automa
 ./run_all_tests.sh
 ```
 
-Runs all 13 phase test files in order (`tests/scenarios/`, `tests/eval/`) and prints pass/fail counts. 245 checks total, covering agents, the state machine (including the `cancelled` status), guardrails, the full pipeline across all 10 named scenarios (7 original + 3 batch-queue cases), the post-acceptance change-management/OPL loop (including Gate 3's Cancel decision and Case 10's completion-notification to the originator), the periodic Gate 2 review queue (now embedded directly in the composer's left panel, §14 — the topline dashboard it used to live on is gone), the visualizer and Gate 2's real Accept/Reject/Hold buttons, and the composer's two ghost-text compose boxes — freeform "compose your own" submission plus the interactive "send a project update" panel — and the Revert back reset. To run one phase at a time:
+Runs all 13 phase test files in order (`tests/scenarios/`, `tests/eval/`) and prints pass/fail counts. 251 checks total, covering agents, the state machine (including the `cancelled` status), guardrails, the full pipeline across all 10 named scenarios (7 original + 3 batch-queue cases), the post-acceptance change-management/OPL loop (including Gate 3's Cancel decision and Case 10's completion-notification to the originator), the periodic Gate 2 review queue (now embedded directly in the composer's left panel, §14 — the topline dashboard it used to live on is gone), the live active-projects status view that replaced the topline dashboard's other real function (§14 follow-up — confirming a schedule/risk/resource change actually applied), the visualizer and Gate 2's real Accept/Reject/Hold buttons, and the composer's two ghost-text compose boxes — freeform "compose your own" submission plus the interactive "send a project update" panel — and the Revert back reset. To run one phase at a time:
 
 ```
 python3 tests/scenarios/test_phase1.py
@@ -78,6 +78,13 @@ it clears instantly, so you never have to remember or retype the field format:
   immediately, unfavorable ones open a real Manual Gate 3, where PMO can Accept, Decline, or
   **Cancel the project entirely** (a distinct `cancelled` status, separate from `rejected`).
 
+Below that, **"active projects"** (§14 follow-up) — every accepted/in_progress project's live
+risk/schedule/resource/CAPEX-funded status, newest-updated first. This is the confirmation view for
+"did my project update actually apply" — a schedule-only change auto-applies immediately with no
+notification and no Gate 3 (Agent 12 doesn't currently treat `schedule_status` alone as
+governance-relevant), so this list is the only place that shows the result. Collapsed by default,
+same as the queue table below.
+
 Below that, **"this week's Gate 2 batch"** (§14) — the Periodic Gate 2 Review queue (§5.3) embedded
 directly in the composer, listing every project sitting at `status='analysis'` right now (the trial
 data seeds exactly 5, so there's always real material to test against). Open this week's batch, then
@@ -100,6 +107,7 @@ command line instead of a click. Seeds the database with all 20 trial projects (
 - `dashboard/visualizer_PRJ-2026-0842.html` — the 1-10 agent pipeline as a graph (boxes, gate diamonds, terminal outcomes), replaying the real path this submission took at 5 seconds/step (readable pace, not a race), with a live execution log and a Replay button
 - `dashboard/notifications_PRJ-2026-0842.html` — every notification actually sent for this project: registration, acceptance/rejection + reason, and the Agent 10 success forecast
 - `dashboard/gate2_queue.html` — the standalone Periodic Gate 2 Review queue (§5.3, §14) — the same fragment embedded in the browser composer's left panel, listing every project sitting at `status='analysis'`, including the 5-row weekly batch the trial data seeds
+- `dashboard/active_projects.html` — the standalone live risk/schedule/resource status view (§14 follow-up) — the same fragment embedded in the browser composer's left panel, listing every accepted/in_progress project's current status so you can confirm a project update actually applied
 
 These link to each other (nav bar at the top). Filenames for the per-project pages depend on which ID the run ended up with — rejected/duplicate/incomplete runs never get a `PRJ-` project ID (they keep their `SUB-xxxx` submission ID instead), so check the "Rendered:" lines the script prints for the exact filenames.
 
@@ -110,7 +118,7 @@ All 7 scenario keys (see `data/trial-projects.json`'s `scenario_index`, or §12 
 
 ## Mock mode
 
-`src/llm/client.py` runs in mock mode whenever `ANTHROPIC_API_KEY` isn't set in the environment — every agent call returns a hand-written, hand-verified mock response instead of hitting a real model. This is how all 245 checks pass without spending any credits. Setting a real `ANTHROPIC_API_KEY` switches to live Claude calls automatically; no code changes needed.
+`src/llm/client.py` runs in mock mode whenever `ANTHROPIC_API_KEY` isn't set in the environment — every agent call returns a hand-written, hand-verified mock response instead of hitting a real model. This is how all 251 checks pass without spending any credits. Setting a real `ANTHROPIC_API_KEY` switches to live Claude calls automatically; no code changes needed.
 
 Two optional, additive upgrades on top of mock mode — both off by default, both fall back cleanly if unset or if the real call fails, neither changes any existing test:
 
@@ -136,6 +144,6 @@ All three came out of a deliberate comparison against a teammate's repo (the fir
 - `data/` — 20 synthetic trial projects (curated, no template duplicates — see `docs/comparing-foos-repo.md`), Playbook, PVP, political, and regulatory docs
 - `src/` — agents, orchestration (state machine, guardrails), db, notifications, LLM client (`src/llm/client.py` for text, `src/llm/embeddings.py` for the optional real-embeddings backend)
 - `scripts/demo_engine.py` — shared logic for running a scenario (seeding, pipeline, rendering); `demo_server.py` (browser composer) and `run_demo.py` (CLI) both call into it
-- `dashboard/` — rendered HTML output (Gate 2/3 pages, visualizer, notifications, OPL) — the Periodic Gate 2 Review queue fragment is embedded live in the composer as well as its own standalone page (§14; the old topline dashboard, activity feed, and comment panel were removed)
-- `tests/` — the 245 acceptance checks across all 13 build phases
+- `dashboard/` — rendered HTML output (Gate 2/3 pages, visualizer, notifications, OPL) — the Periodic Gate 2 Review queue and the live active-projects status view are both embedded directly in the composer as well as their own standalone pages (§14, §14 follow-up; the old topline dashboard, activity feed, and comment panel were removed)
+- `tests/` — the 251 acceptance checks across all 13 build phases
 - `docs/comparing-foos-repo.md` — the teammate-repo comparison this session's upversion came from: what was adopted, what was deliberately skipped, and the exact rollback plan

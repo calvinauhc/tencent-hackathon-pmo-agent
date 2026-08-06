@@ -11,12 +11,17 @@ Comment & Concern panel are gone; this is what replaced them):
             (Accept/Reject/Hold) opens here too, ABOVE the feed — never in the middle panel — so a
             PMO can make the call without losing sight of the flow graph they were just watching.
   - Left:   the 7 named scenarios as predrafted "submission emails" (data/trial-projects.json's
-            scenario_index, §12), each with a "Run this case" button — plus the two compose boxes and,
-            below those, the Periodic Gate 2 Review queue (§5.3) embedded directly (dashboard/
-            render_gate2_queue.py's render_queue_fragment()), listing every project sitting at
-            status='analysis' right now, including this week's 5-project batch (§14). This is the one
-            real entry point for "review a queued project and Accept/Reject/Hold it" — the old
-            topline dashboard used to embed the same fragment; it now lives here instead.
+            scenario_index, §12), each with a "Run this case" button — plus the two compose boxes,
+            then an "active projects" panel (dashboard/render_active_projects.py's
+            render_active_fragment(), §14 follow-up) showing every accepted/in_progress project's
+            live risk/schedule/resource/CAPEX status — the confirmation view for "did my project
+            update actually apply," which had no replacement after the topline dashboard was
+            removed — and finally the Periodic Gate 2 Review queue (§5.3) embedded directly
+            (dashboard/render_gate2_queue.py's render_queue_fragment()), listing every project
+            sitting at status='analysis' right now, including this week's 5-project batch (§14).
+            This is the one real entry point for "review a queued project and Accept/Reject/Hold
+            it" — the old topline dashboard used to embed the same fragment; it now lives here
+            instead.
   - Middle: an iframe showing whatever's happening — Gate 2 review if a PMO decision is needed, or
             the live execution visualizer once it's resolved. No default page (nothing to jump to
             now that the dashboard/activity feed are gone) — it starts blank until a case runs.
@@ -53,6 +58,7 @@ from demo_engine import (
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from src.db.client import get_connection
 from dashboard.render_gate2_queue import render_queue_fragment
+from dashboard.render_active_projects import render_active_fragment
 # Note: run_batch_case/review_queued_project/override_queued_project/open_batch/close_batch and
 # their /batch/, /queue/* HTTP routes below are kept fully wired even though the "Periodic Gate 2
 # Review" left-panel dropdown entry that used to trigger cases 8a/8b/9/10 by button is gone (per an
@@ -172,6 +178,28 @@ button:hover{background:#2c6fb3}
 #queue-embed .queue-details summary{font-size:12px;font-weight:600;margin:10px 0 6px;cursor:pointer;color:#1a1a1a;list-style-position:outside}
 #queue-embed .queue-details summary:hover{color:#378ADD}
 #queue-embed .queue-details table{margin-top:8px}
+/* Active projects — live risk/schedule/resource view (dashboard/render_active_projects.py's
+   render_active_fragment()), §14 follow-up. Same scoping approach and visual language as
+   #queue-embed above, under its own #active-embed prefix so neither fragment's badge/table/details
+   rules bleed into the other. This is the confirmation view for "did my update actually apply" —
+   the topline dashboard used to be the only place that showed live risk/schedule/resource state;
+   nothing replaced it when that dashboard was removed until now. */
+#active-embed{margin-top:8px}
+#active-embed table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px}
+#active-embed th{text-align:left;color:#5f5e5a;font-weight:400;font-size:11px;padding:6px 4px;border-bottom:1px solid #ddd}
+#active-embed td{padding:6px 4px;border-bottom:1px solid #eee;vertical-align:top}
+#active-embed .badge{font-size:11px;padding:2px 8px;border-radius:6px}
+#active-embed .green{background:#eaf3de;color:#3b6d11}
+#active-embed .yellow{background:#faeeda;color:#854f0b}
+#active-embed .red{background:#fcebeb;color:#a32d2d}
+#active-embed .gray{background:#f1efe8;color:#5f5e5a}
+#active-embed .banner{background:#e6f1fb;border:1px solid #378ADD;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px}
+#active-embed .banner b{color:#1a5a92}
+#active-embed .empty{color:#888;font-size:12px;padding:14px;text-align:center}
+#active-embed h3{font-size:12px;margin:10px 0 6px}
+#active-embed .active-details summary{font-size:12px;font-weight:600;margin:10px 0 6px;cursor:pointer;color:#1a1a1a;list-style-position:outside}
+#active-embed .active-details summary:hover{color:#378ADD}
+#active-embed .active-details table{margin-top:8px}
 """
 
 # Ghost-text body editor (shared by "or submit your own" and "or send a project update"): parses a
@@ -351,6 +379,17 @@ real Manual Gate 3 for PMO to accept, decline, or cancel the project.</div>
 '''}
 </div>"""
 
+    # Active projects — live risk/schedule/resource view (§14 follow-up). Sits right below "send a
+    # project update" so the natural flow is: submit an update above, then check here that it
+    # actually took effect — a schedule-only change auto-applies immediately with no notification
+    # and no Gate 3 (Agent 12 doesn't treat schedule_status alone as governance-relevant), so this
+    # is the only place that confirms it. Same render_active_fragment() computation the standalone
+    # active_projects.html page uses.
+    active_fragment, active_len = render_active_fragment(get_connection())
+    active_section = f"""
+<div class="divider"><div class="line"></div><span>active projects{f' ({active_len})' if active_len else ''}</span><div class="line"></div></div>
+<div id="active-embed">{active_fragment}</div>"""
+
     # Periodic Gate 2 Review queue (§5.3, §14) — embedded directly in the left panel now that the
     # topline dashboard that used to hold it is gone. Same render_queue_fragment() computation the
     # standalone gate2_queue.html page uses (see that module's docstring) — never two copies of this
@@ -382,6 +421,7 @@ real Manual Gate 3 for PMO to accept, decline, or cancel the project.</div>
     {"".join(panels)}
     {compose_section}
     {update_section}
+    {active_section}
     {queue_section}
   </div>
   <div class="resizer" id="resize-left" title="Drag to resize"></div>

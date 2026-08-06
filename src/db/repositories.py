@@ -232,6 +232,21 @@ def get_gate2_queue(conn):
     rows = conn.execute("SELECT * FROM projects WHERE status = 'analysis' ORDER BY updated_at").fetchall()
     return [dict(r) for r in rows]
 
+def get_active_projects(conn):
+    """Every accepted/in_progress project — real, live DB state. Was inlined separately in
+    scripts/demo_engine.py's get_updatable_projects() (the "send a project update" panel's source
+    list) and now also backs dashboard/render_active_projects.py's live risk/schedule/resource
+    view (§14 follow-up — the topline dashboard used to be the only place this was visible; when
+    it was removed, nothing replaced it, so an applied schedule/risk/resource change had no live
+    view to confirm it took effect). draft/pmo_review/analysis rows haven't been accepted yet, and
+    completed/cancelled/rejected ones are terminal (schemas.py's ALLOWED_TRANSITIONS) — same filter
+    render_topline.py used to apply directly. Ordered newest-updated-first so a change a PMO just
+    applied surfaces at the top, not buried under untouched seed rows."""
+    rows = conn.execute(
+        "SELECT * FROM projects WHERE status IN ('accepted', 'in_progress') ORDER BY updated_at DESC"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
 def get_latest_agent_payload(conn, project_id, agent):
     """§5.3 — reconstructs a queued project's Agent 5/6 findings from audit_log on demand, for
     rendering its Gate 2 page when a PMO pulls it out of the queue to review (rather than keeping

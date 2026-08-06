@@ -202,6 +202,38 @@ for r in conn2.execute("SELECT status FROM projects").fetchall():
 check("13.8 the reseeded fixture still has exactly 5 rows in this week's Gate 2 batch (§14)",
       statuses_count_after.get("analysis") == 5, statuses_count_after)
 
+# --- 13.9 (§14 follow-up) a schedule-only update auto-applies (schedule_status isn't governance-
+# relevant per Agent 12's GOVERNANCE_AXES) AND the new "active projects" panel actually shows the
+# result — this is the real fix for the reported bug ("changed schedule from green to red, active
+# listing didn't update"): there was never a persistence bug, there was no live view at all. ---
+schedule_target = get_project_by_ref(conn2, "PRJ-2026-0791")
+check("13.9 setup: PRJ-2026-0791 is accepted and schedule_status starts green post-reset",
+      schedule_target["status"] == "accepted" and schedule_target["schedule_status"] == "green",
+      (schedule_target["status"], schedule_target["schedule_status"]))
+
+schedule_result = demo_engine.submit_project_update_freeform(
+    "PRJ-2026-0791", "Grace Lim <grace.lim@company.com>", "Schedule update",
+    "Schedule: red\n\nNote: Vendor slipped, flagging red."
+)
+check("13.9 a schedule-only change auto-applies (not governance-relevant on its own)",
+      schedule_result.get("applied") is True and schedule_result.get("evaluation") == "favorable",
+      schedule_result)
+
+updated_target = get_project_by_ref(conn2, "PRJ-2026-0791")
+check("13.9 the DB actually persisted red — confirms no persistence bug, ever",
+      updated_target["schedule_status"] == "red", updated_target["schedule_status"])
+
+landing_after_update = demo_server.render_landing()
+check("13.9 the composer's left panel now has an active-projects panel", 'id="active-embed"' in landing_after_update)
+active_block = landing_after_update.split('id="active-embed"')[1]
+check("13.9 that panel shows PRJ-2026-0791's updated schedule_status (red) — the actual fix",
+      'PRJ-2026-0791' in active_block and '<span class="badge red">red</span>' in active_block)
+
+from dashboard.render_active_projects import render_active_fragment
+standalone_fragment, standalone_count = render_active_fragment(conn2)
+check("13.9 the standalone fragment (dashboard/active_projects.html's source) agrees",
+      'PRJ-2026-0791' in standalone_fragment and standalone_count >= 1)
+
 print()
 passed = sum(1 for _, s in results if s == "PASS")
 print(f"Phase 13: {passed}/{len(results)} checks passed")

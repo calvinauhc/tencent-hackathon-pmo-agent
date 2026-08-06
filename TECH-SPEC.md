@@ -745,6 +745,26 @@ All 5 items exist under `data/`: `playbook.md`, `pvp.md`, `political.md`, `regul
     history — left as-is for the record (and because PORTING.md/§15's Next.js port target may still
     reference the underlying `project_comments` data model, §3, even with no UI surfacing it in this
     build) — but they no longer describe what's actually rendered. This bullet is the current truth.
+- **§14 active-projects follow-up (2026-08-06):** a real gap surfaced once the topline dashboard was
+  gone — a PMO changing a project's `schedule_status` (e.g. green → red) via "send a project update"
+  had no way to confirm it actually applied. Root-caused to two independent things, neither a
+  persistence bug: (1) `apply_project_update()` (`src/db/repositories.py`) correctly writes the field
+  on both the auto-apply and Gate-3-authorize paths — always has; (2) Agent 12's `GOVERNANCE_AXES`
+  (`src/agents/agent12_change_evaluator.py`) deliberately excludes `schedule_status`/`resource_indicator`
+  from what counts as a governance-relevant change ("tracking colors, not governance decisions on
+  their own"), so a schedule-only change always evaluates as favorable and auto-applies immediately —
+  no Gate 3, no notification, nothing to see. That auto-apply behavior is unchanged here (a real
+  product decision, not a bug — flagged separately, not touched); what was missing was ANY live view
+  of current risk/schedule/resource state after acceptance, which the topline dashboard used to be the
+  only place showing. Added `dashboard/render_active_projects.py` (`render_active_fragment()`, same
+  split as the Gate 2 queue's `render_queue_fragment()`) — a live table of every accepted/in_progress
+  project's current status/risk/schedule/resource/CAPEX-funded/success-score, newest-updated first,
+  embedded in the composer's left panel directly below "send a project update" and collapsed by
+  default (`<details>`, same clutter-reduction pattern the Gate 2 queue table already uses). Backed by
+  a new `get_active_projects()` (`src/db/repositories.py`) that `scripts/demo_engine.py`'s
+  `get_updatable_projects()` (the update panel's own project dropdown) now also calls, so there is one
+  definition of "active," not two that could drift. A standalone `dashboard/active_projects.html` page
+  exists too, same role `gate2_queue.html` plays for the queue.
 
 **`trial-projects.json` structure**: `{ scenario_index, projects }`. `projects` is 20 entries spanning all seven `status` values in §3's enum. `scenario_index` maps each of §12's 7 named test scenarios directly to the `project_id`/`submission_id` that demonstrates it — e.g. scenario 6 (change request via stakeholder flag) points straight at PRJ-2026-0842, the same "Smart inventory forecasting agent" project used in the §9.2 comment-panel example, so the trial data and the worked examples in this spec are the same project, not two disconnected fixtures. `tests/scenarios/` (§15) should read fixtures via `scenario_index` rather than hardcoding IDs, so re-generating the dataset doesn't silently break the test suite.
 

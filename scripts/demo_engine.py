@@ -16,6 +16,7 @@ from src.db.repositories import (
     insert_project, write_comment, get_project, get_project_by_ref, get_project_updates,
     get_change_request, update_status, get_gate2_queue, get_open_gate2_batch, open_gate2_batch,
     close_gate2_batch, get_latest_agent_payload, write_notification, write_audit_log,
+    get_active_projects,
 )
 from src.notifications.templates import opl_published
 from src.shared.schemas import Project
@@ -480,11 +481,10 @@ def get_updatable_projects():
     demo_server.py); this is the one place both callers get the same accepted/in_progress rows
     from. draft/pmo_review/analysis rows haven't been accepted yet, and completed/cancelled/rejected
     ones are already terminal (schemas.py's ALLOWED_TRANSITIONS) — same filter render_topline.py
-    used to apply directly."""
-    conn = get_connection()
-    return [dict(r) for r in conn.execute(
-        "SELECT * FROM projects WHERE status IN ('accepted', 'in_progress') ORDER BY updated_at DESC"
-    ).fetchall()]
+    used to apply directly. Now backed by src/db/repositories.get_active_projects(), the same query
+    dashboard/render_active_projects.py uses for its live status view — one definition of "active,"
+    not two that could drift apart."""
+    return get_active_projects(get_connection())
 
 
 def submit_project_update_freeform(project_ref, from_field, subject, body):
