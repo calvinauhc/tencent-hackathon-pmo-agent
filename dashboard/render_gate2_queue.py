@@ -39,6 +39,9 @@ td{padding:8px 6px;border-bottom:1px solid #eee;vertical-align:top}
 .override-form button{padding:3px 8px;font-size:11px;background:#ef9f27}
 .override-form button:hover{background:#d98a1a}
 .empty{color:#888;font-size:13px;padding:20px;text-align:center}
+.queue-details summary{font-size:14px;font-weight:600;margin-bottom:8px;cursor:pointer;color:#1a1a1a;list-style-position:outside}
+.queue-details summary:hover{color:#378ADD}
+.queue-details table{margin-top:10px}
 """
 
 
@@ -149,6 +152,21 @@ def render_queue_fragment(conn):
         f'<table><tr><th>Project</th><th style="text-align:right">CAPEX</th><th>Agent 5</th><th>Agent 6</th><th>Actions</th></tr>{"".join(rows_html)}</table>'
         if rows_html else '<div class="empty">The Gate 2 queue is empty — nothing is currently sitting at Manual Gate 2.</div>'
     )
+    # Queued-project table is the tallest, most repetitive part of this fragment (one row per queued
+    # project, embedded directly in the composer's left panel now — a full-width standalone page had
+    # room for it always open, a narrow sidebar doesn't). Collapsed by default via a native <details>
+    # (no JS needed) — the banner/rollup above still give the "what's waiting, what it's asking for"
+    # summary at a glance; the actual row-by-row table is one click away, not clutter by default.
+    # Nothing to collapse when the queue is empty — show the empty-state message plainly instead.
+    queued_section = (
+        f"""<details class="queue-details">
+<summary>Queued projects ({len(queue_rows)})</summary>
+{table_html}
+</details>"""
+        if rows_html else
+        f"""<h3 style="font-size:14px;margin-bottom:8px">Queued projects (0)</h3>
+{table_html}"""
+    )
 
     fragment = f"""<div class="banner"><b>Periodic Gate 2 Review (§5.3).</b> Every project here has finished Agent 5/6
 analysis and is waiting for a real Gate 2 decision — reviewed together, weekly by default, so a
@@ -158,8 +176,7 @@ still be pulled out early with a logged reason.</div>
 {batch_status_html}
 <h3 style="font-size:14px;margin-bottom:8px">Regional CAPEX rollup</h3>
 <div class="rollups">{rollups_html}</div>
-<h3 style="font-size:14px;margin-bottom:8px">Queued projects ({len(queue_rows)})</h3>
-{table_html}"""
+{queued_section}"""
     return fragment, len(queue_rows)
 
 

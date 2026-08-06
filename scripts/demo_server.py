@@ -166,6 +166,12 @@ button:hover{background:#2c6fb3}
 #queue-embed .override-form button:hover{background:#d98a1a}
 #queue-embed .empty{color:#888;font-size:12px;padding:14px;text-align:center}
 #queue-embed h3{font-size:12px;margin:10px 0 6px}
+/* Queued-projects table collapses behind a native <details> (dashboard/render_gate2_queue.py) —
+   one row per queued project is the tallest, most repetitive part of this narrow left-panel embed,
+   so it starts closed rather than always pushing everything below it down the page. */
+#queue-embed .queue-details summary{font-size:12px;font-weight:600;margin:10px 0 6px;cursor:pointer;color:#1a1a1a;list-style-position:outside}
+#queue-embed .queue-details summary:hover{color:#378ADD}
+#queue-embed .queue-details table{margin-top:8px}
 """
 
 # Ghost-text body editor (shared by "or submit your own" and "or send a project update"): parses a
