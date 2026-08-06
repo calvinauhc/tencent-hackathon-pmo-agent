@@ -15,7 +15,7 @@ from src.db.client import get_connection
 from src.db.repositories import (
     insert_project, write_comment, get_project, get_project_by_ref, get_project_updates,
     get_change_request, update_status, get_gate2_queue, get_open_gate2_batch, open_gate2_batch,
-    close_gate2_batch, get_latest_agent_payload, write_notification,
+    close_gate2_batch, get_latest_agent_payload, write_notification, write_audit_log,
 )
 from src.notifications.templates import opl_published
 from src.shared.schemas import Project
@@ -30,11 +30,8 @@ from src.agents.agent11_update_logger import (
 from src.agents.agent12_change_evaluator import process_update, resolve_gate3
 from src.agents.agent13_opl_composer import compose_opl, publish_opl
 from src.shared.schemas import Status
-from dashboard.render_topline import render as render_topline
 from dashboard.render_visualizer import render as render_visualizer
-from dashboard.render_comments import render as render_comments
 from dashboard.render_notifications import render as render_notifications
-from dashboard.render_activity import render as render_activity
 from dashboard.render_gate2 import render as render_gate2
 from dashboard.render_gate3 import render as render_gate3
 from dashboard.render_opl import render as render_opl_page
@@ -169,8 +166,44 @@ SCENARIO_ORDER = [
 ]
 
 
+# --- "This week's batch" — trial-data rows seeded directly at status='analysis' (§14 rebalance)
+# never actually ran through Agent 5/6 (insert_project() is a raw seed insert, not a pipeline run),
+# so _reconstruct_gate2_trace() (the thing "Review & decide" and "Pull from queue" both call) would
+# otherwise fail with "Could not reconstruct Agent 5/6 findings" the instant a PMO tries to act on
+# one — the queue would list them but be unable to open them. Seed one plausible, clearly-synthetic
+# audit_log entry per analysis-status row so the batch is genuinely actionable end to end, not just a
+# static list. Verdicts are deliberately mixed (aligned/misaligned/inconclusive) so accept, reject,
+# and hold all have a real candidate to exercise.
+QUEUE_SEED_MOCKS = {
+    "SUB-0025": {"agent5": {"margin_impact": "positive", "citation": "New initiatives are expected to demonstrate a credible path to at least 15% margin within 18 months of launch"},
+                 "agent6": {"verdict": "aligned", "citation": "AI-enabled operational tooling, supply chain digitization, customer-facing automation"}},
+    "SUB-0029": {"agent5": {"margin_impact": "unclear", "citation": "New initiatives are expected to demonstrate a credible path to at least 15% margin within 18 months of launch"},
+                 "agent6": {"verdict": "aligned", "citation": "AI-enabled operational tooling, supply chain digitization, customer-facing automation"}},
+    "SUB-0014": {"agent5": {"margin_impact": "unclear", "citation": "New initiatives are expected to demonstrate a credible path to at least 15% margin within 18 months of launch"},
+                 "agent6": {"verdict": "misaligned", "citation": "Consumer-facing new product lines outside existing verticals"}},
+    "SUB-0020": {"agent5": {"margin_impact": "unclear", "citation": "New initiatives are expected to demonstrate a credible path to at least 15% margin within 18 months of launch"},
+                 "agent6": {"verdict": "inconclusive", "citation": "unknown or unquantified regulatory risk defaults to"}},
+    "SUB-0009": {"agent5": {"margin_impact": "unclear", "citation": "New initiatives are expected to demonstrate a credible path to at least 15% margin within 18 months of launch"},
+                 "agent6": {"verdict": "aligned", "citation": "AI-enabled operational tooling, supply chain digitization, customer-facing automation"}},
+}
+
+
+def _seed_queue_agent_payloads(conn, projects):
+    for p in projects:
+        if p.status != "analysis":
+            continue
+        mocks = QUEUE_SEED_MOCKS.get(p.submission_id)
+        if not mocks:
+            continue
+        pid = p.project_id or p.submission_id
+        if get_latest_agent_payload(conn, pid, "agent5_business_impact") is None:
+            write_audit_log(conn, pid, "agent5_business_impact", "analyze", mocks["agent5"], 0)
+        if get_latest_agent_payload(conn, pid, "agent6_knowledge_crosscheck") is None:
+            write_audit_log(conn, pid, "agent6_knowledge_crosscheck", "crosscheck", mocks["agent6"], 0)
+
+
 def run_scenario(scenario_key):
-    """Seeds all trial projects, runs one scenario through the real pipeline, renders all five
+    """Seeds all trial projects, runs one scenario through the real pipeline, renders the remaining
     dashboard pages, and returns a dict describing what happened and where to look."""
     conn = get_connection(fresh=True)
     projects, idx = load_trial_data()
@@ -180,6 +213,7 @@ def run_scenario(scenario_key):
 
     for p in projects:
         insert_project(conn, p)
+    _seed_queue_agent_payloads(conn, projects)
 
     ref = idx[scenario_key]
     target = get(ref[1] if isinstance(ref, list) else ref)
@@ -196,36 +230,24 @@ def run_scenario(scenario_key):
                       "This touches EU customer data — confirm a GDPR review is scheduled before go-live.",
                       is_flagged_concern=True, linked_gate=None)
 
-    t_path, t_count = render_topline()
     v_path, v_steps = render_visualizer(result_id)
-    c_path, c_count = render_comments(result_id)
     n_path, n_count = render_notifications(result_id)
-    a_path, a_count = render_activity()
 
     return {
         "scenario_key": scenario_key,
         "trace": trace,
         "result_id": result_id,
-        "paths": {
-            "topline": t_path, "visualizer": v_path, "comments": c_path,
-            "notifications": n_path, "activity": a_path,
-        },
-        "counts": {"projects": t_count, "steps": v_steps, "comments": c_count,
-                   "notifications": n_count, "activity": a_count},
+        "paths": {"visualizer": v_path, "notifications": n_path},
+        "counts": {"steps": v_steps, "notifications": n_count},
     }
 
 
 def _render_all(result_id, resume_from=None):
-    t_path, t_count = render_topline()
     v_path, v_steps = render_visualizer(result_id, resume_from=resume_from)
-    c_path, c_count = render_comments(result_id)
     n_path, n_count = render_notifications(result_id)
-    a_path, a_count = render_activity()
     return {
-        "paths": {"topline": t_path, "visualizer": v_path, "comments": c_path,
-                  "notifications": n_path, "activity": a_path},
-        "counts": {"projects": t_count, "steps": v_steps, "comments": c_count,
-                   "notifications": n_count, "activity": a_count},
+        "paths": {"visualizer": v_path, "notifications": n_path},
+        "counts": {"steps": v_steps, "notifications": n_count},
     }
 
 
@@ -246,6 +268,7 @@ def run_scenario_to_gate2(scenario_key):
 
     for p in projects:
         insert_project(conn, p)
+    _seed_queue_agent_payloads(conn, projects)
 
     ref = idx[scenario_key]
     target = get(ref[1] if isinstance(ref, list) else ref)
@@ -391,6 +414,7 @@ def _ensure_seeded(conn, project_ref):
     projects, _idx = load_trial_data()
     for p in projects:
         insert_project(conn, p)
+    _seed_queue_agent_payloads(conn, projects)
     return get_project_by_ref(conn, project_ref)
 
 def _redirect_with_notification(base_path, notif, trigger_label="Agent 12 · Change evaluator"):
@@ -430,11 +454,8 @@ def submit_project_update(project_ref, kind):
     entry = log_update(conn, row, submitted_fields, submitted_by=payload["submitted_by"], note=payload["note"])
     result = process_update(conn, entry, row["project_name"], requested_by=payload["submitted_by"])
 
-    render_topline()
-    render_activity()
-
     if result["applied"]:
-        redirect = _redirect_with_notification("/dashboard/topline.html", result.get("notification"))
+        redirect = _redirect_with_notification("/dashboard/gate2_queue.html", result.get("notification"))
         return {"applied": True, "evaluation": result["evaluation"], "reason": result["reason"],
                 "redirect": redirect}
 
@@ -454,8 +475,8 @@ def submit_project_update(project_ref, kind):
 # a field that isn't actually stated) then Agent 12 exactly as Case 8/9 already do.
 def get_updatable_projects():
     """Every project the "Send a project update" panel can legitimately target right now — real,
-    live DB state, not the trial-data snapshot. Was topline.html's own query (dashboard/
-    render_topline.py) before that panel moved into the composer's left panel (scripts/
+    live DB state, not the trial-data snapshot. Was the (now-removed) topline dashboard's own query
+    before that panel moved into the composer's left panel (scripts/
     demo_server.py); this is the one place both callers get the same accepted/in_progress rows
     from. draft/pmo_review/analysis rows haven't been accepted yet, and completed/cancelled/rejected
     ones are already terminal (schemas.py's ALLOWED_TRANSITIONS) — same filter render_topline.py
@@ -490,11 +511,8 @@ def submit_project_update_freeform(project_ref, from_field, subject, body):
     entry = log_update(conn, row, fields, submitted_by=submitted_by, note=note or "(no note provided)")
     result = process_update(conn, entry, row["project_name"], requested_by=submitted_by)
 
-    render_topline()
-    render_activity()
-
     if result["applied"]:
-        redirect = _redirect_with_notification("/dashboard/topline.html", result.get("notification"))
+        redirect = _redirect_with_notification("/dashboard/gate2_queue.html", result.get("notification"))
         return {"applied": True, "evaluation": result["evaluation"], "reason": result["reason"],
                 "redirect": redirect}
 
@@ -520,10 +538,8 @@ def resolve_gate3_decision(change_request_id, decision, pmo_comment=""):
         # Already resolved (refresh, double-click, the page re-submitting) — same idempotency
         # concern /gate2/'s RESOLVED dict handles, but here the change_requests row itself already
         # carries its own resolved state, so re-reading it is enough; no separate in-memory map needed.
-        return {"redirect": "/dashboard/topline.html", "status": cr["status"], "note": str(e)}
-    render_topline()
-    render_activity()
-    redirect = _redirect_with_notification("/dashboard/topline.html", result.get("notification"))
+        return {"redirect": "/dashboard/gate2_queue.html", "status": cr["status"], "note": str(e)}
+    redirect = _redirect_with_notification("/dashboard/gate2_queue.html", result.get("notification"))
     return {"redirect": redirect, **result}
 
 
@@ -582,9 +598,6 @@ def complete_project(project_ref, mock_response=None):
     composed, _dur = compose_opl(conn, row, mock_response=mock_response or OPL_DEMO_MOCK)
     opl_path = publish_opl(conn, row, composed)
     render_opl_page(project_id, row, composed)
-
-    render_topline()
-    render_activity()
 
     # Tell the ORIGINATOR the OPL is real and published, not just a DB row nobody heard about —
     # same "reply to the person who asked" pattern Agent 12's change-management notifications
@@ -729,14 +742,12 @@ def run_batch_case(case_key):
         if existing_row["status"] == "analysis":
             render_gate2_queue()
             return {"redirect": "/dashboard/gate2_queue.html"}
-        return {"redirect": "/dashboard/topline.html"}
+        return {"redirect": "/dashboard/gate2_queue.html"}
 
     mocks = BATCH_CASE_MOCKS[case_key]
     trace = run_intake_to_gate2(conn, project, [], mocks)
-    render_topline()
-    render_activity()
     if trace.get("final_status") != "pending_gate2":
-        return {"redirect": "/dashboard/topline.html"}
+        return {"redirect": "/dashboard/gate2_queue.html"}
 
     if is_fast_track(project):
         render_gate2(project.submission_id, project, trace)
@@ -788,18 +799,18 @@ def open_batch():
     if get_open_gate2_batch(conn) is None:
         open_gate2_batch(conn, opened_by="PMO")
     render_gate2_queue()  # keeps the standalone gate2_queue.html page correct too
-    render_topline()
-    # Topline now embeds this same queue (§5.3 redesign) — send the middle panel back there, not to
-    # the standalone page, so the PMO sees the freshly-opened batch in place.
-    return {"redirect": "/dashboard/topline.html#gate2review"}
+    # The queue is embedded directly in the composer's left panel (scripts/demo_server.py's
+    # render_landing(), reading render_gate2_queue.render_queue_fragment() live) — this form posts
+    # target="_top" (dashboard/render_gate2_queue.py's batch_status_html), so redirecting to "/"
+    # reloads the whole composer and the embedded queue comes back fresh, batch open.
+    return {"redirect": "/"}
 
 
 def close_batch(batch_id):
     conn = get_connection()
     close_gate2_batch(conn, batch_id)
     render_gate2_queue()
-    render_topline()
-    return {"redirect": "/dashboard/topline.html#gate2review"}
+    return {"redirect": "/"}
 
 
 # --- Freeform "compose your own" submission (§12.1 composer, "comparing Foo's repo" upversion) ---
@@ -891,13 +902,13 @@ DASHBOARD_DIR = os.path.join(os.path.dirname(__file__), "..", "dashboard")
 DATA_OPL_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "opl")
 
 def reset_demo():
-    """Wipes and reseeds the DB back to the pristine 20-project trial fixture, deletes every
-    generated per-run artifact (visualizer_*.html, gate2_*.html, gate3_*.html, comments_*.html,
-    notifications_*.html, opl_*.html, and the published data/opl/*.md packets from a Case 10 run —
-    everything scripts/*.py don't ship as tracked source), and regenerates the three "always present"
-    pages (topline, activity, the standalone Gate 2 queue) fresh. Doesn't touch anything server-side
-    session state — scripts/demo_server.py clears its own PENDING/RESOLVED dicts separately, since
-    those are composer state, not demo data this function owns."""
+    """Wipes and reseeds the DB back to the pristine 20-project trial fixture (5 of them sitting at
+    status='analysis' — this week's Gate 2 batch, §14), deletes every generated per-run artifact
+    (visualizer_*.html, gate2_*.html, gate3_*.html, notifications_*.html, opl_*.html, and the
+    published data/opl/*.md packets from a Case 10 run — everything scripts/*.py don't ship as
+    tracked source), and regenerates the standalone Gate 2 queue page fresh. Doesn't touch anything
+    server-side session state — scripts/demo_server.py clears its own PENDING/RESOLVED dicts
+    separately, since those are composer state, not demo data this function owns."""
     for path in glob.glob(os.path.join(DASHBOARD_DIR, "*.html")):
         os.remove(path)
     if os.path.isdir(DATA_OPL_DIR):
@@ -908,8 +919,7 @@ def reset_demo():
     projects, _idx = load_trial_data()
     for p in projects:
         insert_project(conn, p)
+    _seed_queue_agent_payloads(conn, projects)
 
-    render_topline()
-    render_activity()
     render_gate2_queue()
     return {"projects_reseeded": len(projects)}

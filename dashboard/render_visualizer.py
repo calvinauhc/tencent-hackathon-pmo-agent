@@ -249,6 +249,20 @@ def render(project_id, replay_pace_ms=5000, redirect_to=None, resume_from=None):
         if redirect_to else ""
     )
 
+    # Comments/Notifications pages only exist for project IDs that actually reached a point where
+    # something got rendered for them (e.g. an accepted project) — cases that stop earlier (like
+    # SUB-CASE9, parked mid-flow for the Gate 3 demo) never get those pages written. Linking to a
+    # page that doesn't exist is a dead-end 404 for whoever's driving the demo, so only show each
+    # link if its target file is actually on disk.
+    _dash_dir = os.path.dirname(__file__)
+    extra_nav_links = "".join(
+        f'<a href="{fname}">{label}</a>'
+        for fname, label in (
+            (f"notifications_{project_id}.html", "Notifications"),
+        )
+        if os.path.exists(os.path.join(_dash_dir, fname))
+    )
+
     html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Live Execution Visualizer — {project_id}</title>
 <style>
 body{{font-family:-apple-system,Helvetica,Arial,sans-serif;margin:1.5rem 2rem;color:#2a2a28}}
@@ -285,8 +299,8 @@ line.edge.lit.done{{stroke:#639922}}
 .legend span{{display:inline-flex;align-items:center;gap:5px}}
 .sw{{width:10px;height:10px;border-radius:3px;display:inline-block}}
 </style></head><body>
-<div class="nav"><a href="/" target="_top">← Composer</a><a href="topline.html">Topline</a><a href="activity.html">Activity feed</a>
-<a href="comments_{project_id}.html">Comments</a><a href="notifications_{project_id}.html">Notifications</a></div>
+<div class="nav"><a href="/" target="_top">← Composer</a>
+{extra_nav_links}</div>
 <h3>Live Execution Visualizer — {project_id}</h3>
 {status_banner}
 <div id="topbar">

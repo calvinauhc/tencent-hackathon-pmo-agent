@@ -1,4 +1,16 @@
-"""Phase 4 verification — BUILD-TASKS.md 4.1-4.4. Structural checks on rendered HTML + a live demo run."""
+"""Phase 4 verification — BUILD-TASKS.md 4.1-4.4. Structural checks on rendered HTML + a live demo run.
+
+§14 note: BUILD-TASKS.md's original 4.1 (topline dashboard) and 4.3 (Comment and Concern Panel) were
+later REMOVED at explicit user request — the topline dashboard, portfolio activity feed, and
+stakeholder Comment & Concern panel are gone. What replaced each, and what this file checks instead:
+  - 4.1's metric cards/distribution panels/risk-mix/needs-attention/project-table are gone outright;
+    its one surviving piece — the embedded Periodic Gate 2 Review queue — moved into the composer's
+    left panel (dashboard/render_gate2_queue.py, via scripts/demo_server.py's render_landing()). This
+    file now checks THAT.
+  - 4.3's PMO-vs-stakeholder permission split doesn't exist as a separate page anymore; the PMO side
+    of it (Accept/Reject, plus Hold) survives as Gate 2's real decision buttons
+    (dashboard/render_gate2.py). This file now checks those three buttons exist and are wired.
+"""
 import sys, os, subprocess
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -16,18 +28,16 @@ check("4.4 demo run reaches a real final_status", "final_status" not in proc.std
 
 base = os.path.join(os.path.dirname(__file__), "..", "..", "dashboard")
 
-# --- 4.1 topline dashboard ---
-with open(os.path.join(base, "topline.html")) as f:
-    topline_html = f.read()
-check("4.1 topline has 4 metric cards", topline_html.count('class="mcard"') == 4)
-check("4.1 topline has 4 real governance distribution panels (status/capex/health/BU value)",
-      topline_html.count('class="distro"') == 4)
-check("4.1 topline has risk-mix strip", "Risk mix" in topline_html)
-check("4.1 topline embeds the Periodic Gate 2 Review queue", 'id="gate2review"' in topline_html and "Periodic Gate 2 Review" in topline_html)
-check("4.1 topline table headers are sortable", 'class="sortable"' in topline_html and "sort" in topline_html.lower())
-check("4.1 topline has a project table", "<table" in topline_html)
-has_attention = "Needs attention" in topline_html
-check("4.1 needs-attention panel renders when a red project has help_needed", has_attention, "present" if has_attention else "no red+help_needed project in this run — check separately below")
+# --- 4.1 (§14) the Periodic Gate 2 Review queue is embedded in the composer's left panel ---
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
+import demo_server
+landing = demo_server.render_landing()
+check("4.1 the composer embeds the Periodic Gate 2 Review queue (not a separate topline page)",
+      'id="queue-embed"' in landing and "Periodic Gate 2 Review" in landing)
+check("4.1 the queue lists this week's batch (5 analysis-status rows seeded, §14)",
+      "this week's Gate 2 batch" in landing)
+check("4.1 the old topline dashboard is genuinely gone, not just unlinked", not os.path.isfile(os.path.join(base, "topline.html")))
+check("4.1 the old activity feed is genuinely gone", not os.path.isfile(os.path.join(base, "activity.html")))
 
 # --- 4.2 replay visualizer ---
 vis_path = os.path.join(base, "visualizer_PRJ-2026-0842.html")
@@ -37,27 +47,26 @@ check("4.2 visualizer embeds real audit_log steps (not empty)", '"agent":' in vi
 check("4.2 replay pace is demo-readable (5s/step)", "const pace = 5000" in vis_html)
 check("4.2 node states (active/complete) are wired in JS", "classList.add('active')" in vis_html and "classList.add('complete')" in vis_html)
 
-# --- 4.3 comment panel permission split ---
-com_path = os.path.join(base, "comments_PRJ-2026-0842.html")
-with open(com_path) as f:
-    com_html = f.read()
-check("4.3 real flagged concern from Wei Ling Tan is rendered", "Wei Ling Tan" in com_html and "flagged concern" in com_html)
-check("4.3 PMO composer has Accept/Reject buttons", "<button>Accept</button>" in com_html and "<button>Reject</button>" in com_html)
-pmo_section, _, stakeholder_section = com_html.partition("Posting as stakeholder")
-check("4.3 stakeholder composer has NO Accept/Reject controls", "<button>Accept</button>" not in stakeholder_section)
-check("4.3 stakeholder composer has the flag-a-concern toggle", "Flag as a concern for PMO review" in stakeholder_section)
-
-# --- separately confirm the needs-attention mechanism itself works on data known to trigger it ---
+# --- 4.3 (§14) Gate 2's real PMO decision controls: Accept, Reject, and Hold ---
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.db.client import get_connection
+from src.db.repositories import get_gate2_queue
+from dashboard.render_gate2 import render as render_gate2
 conn = get_connection()
-conn.execute("UPDATE projects SET risk_indicator='red', help_needed='Test blocker text' WHERE submission_id='SUB-0001'")
-conn.commit()
-from dashboard.render_topline import render as render_topline
-render_topline()
-with open(os.path.join(base, "topline.html")) as f:
-    topline_html2 = f.read()
-check("4.1 needs-attention panel populates for a known red+help_needed project", "Test blocker text" in topline_html2)
+queue = get_gate2_queue(conn)
+check("4.3 this week's Gate 2 batch is genuinely queryable (status='analysis' rows exist)", len(queue) >= 1, len(queue))
+if queue:
+    row = queue[0]
+    from demo_engine import _reconstruct_gate2_trace
+    project, trace, err = _reconstruct_gate2_trace(conn, row["submission_id"])
+    check("4.3 a queued row's Agent 5/6 findings genuinely reconstruct from audit_log (§14 seed)", err is None, err)
+    if not err:
+        g_path = render_gate2(row["submission_id"], project, trace)
+        with open(g_path) as f:
+            g_html = f.read()
+        check("4.3 Gate 2 page has an Accept button", 'id="accept-btn"' in g_html)
+        check("4.3 Gate 2 page has a Reject button", 'id="reject-btn"' in g_html)
+        check("4.3 Gate 2 page has a Hold button (the third real outcome, §14)", 'id="hold-btn"' in g_html)
 
 print()
 passed = sum(1 for _, s in results if s == "PASS")

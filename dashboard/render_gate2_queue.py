@@ -90,10 +90,10 @@ def _badge(val):
 def render_queue_fragment(conn):
     """The queue's actual content — banner, batch-status bar, regional rollups, queued-project
     table — as a standalone HTML fragment (no <html>/<body>/nav wrapper), so both the standalone
-    gate2_queue.html page below AND the embedded copy on topline.html (dashboard/render_topline.py,
-    per the ask to move Periodic Gate 2 Review "into" the topline dashboard rather than leaving it
-    only reachable through the old composer batch buttons) render from exactly one computation —
-    never two copies of this logic that could drift apart. Returns (fragment_html, queue_len)."""
+    gate2_queue.html page below AND the embedded copy in the composer's left panel (scripts/
+    demo_server.py's render_landing() — moved there from the now-removed topline dashboard, §14)
+    render from exactly one computation — never two copies of this logic that could drift apart.
+    Returns (fragment_html, queue_len)."""
     queue_rows = get_gate2_queue(conn)
     rollups = _compute_region_rollups(conn, queue_rows)
     open_batch = get_open_gate2_batch(conn)
@@ -126,15 +126,21 @@ def render_queue_fragment(conn):
   </td>
 </tr>""")
 
+    # target="_top" (not "middle-frame") — this fragment is now embedded directly in the composer's
+    # left panel (scripts/demo_server.py's render_landing()), which is the top-level document itself,
+    # not something living inside an iframe. A whole-page reload after Open/Close batch is exactly
+    # what's wanted: the freshly re-rendered queue fragment comes back showing the new batch state,
+    # right where a PMO is already looking. (Also fixes the standalone gate2_queue.html page below,
+    # which has no "middle-frame" target at all.)
     batch_status_html = (
         f"""<div class="batch-status">
   <span>Batch <b>#{open_batch['id']}</b> open since {open_batch['opened_at']} (opened by {html_lib.escape(open_batch['opened_by'] or 'PMO')})</span>
-  <form method="POST" action="/queue/close-batch/{open_batch['id']}" target="middle-frame"><button type="submit">Close this batch</button></form>
+  <form method="POST" action="/queue/close-batch/{open_batch['id']}" target="_top"><button type="submit">Close this batch</button></form>
 </div>"""
         if open_batch else
         """<div class="batch-status">
   <span>No batch currently open.</span>
-  <form method="POST" action="/queue/open-batch" target="middle-frame"><button type="submit">Open this week's batch</button></form>
+  <form method="POST" action="/queue/open-batch" target="_top"><button type="submit">Open this week's batch</button></form>
 </div>"""
     )
 
@@ -158,14 +164,40 @@ still be pulled out early with a logged reason.</div>
 
 
 def render():
-    """Standalone gate2_queue.html page — kept for direct linking/debugging even though the primary
-    PMO entry point is now the embedded copy on topline.html (see render_queue_fragment() above)."""
+    """Standalone gate2_queue.html page — kept for direct linking/debugging and as the landing page
+    for actions that don't have a live composer to refresh (e.g. a hold decision, or a change-
+    management notification redirect) even though the primary PMO entry point is now the embedded
+    copy in the composer's left panel (see render_queue_fragment() above)."""
     conn = get_connection()
     fragment, queue_len = render_queue_fragment(conn)
     html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Gate 2 — Batch Queue</title>
 <style>{CSS}</style></head><body>
-<div class="nav"><a href="/dashboard/topline.html" target="_top">← Dashboard</a></div>
+<div class="nav"><a href="/" target="_top">← Composer</a></div>
 {fragment}
+<script>
+// Case 8/9 (§7.2 change management) and a plain project-update never run through the Live Execution
+// Visualizer, which is normally what tells the composer's top notifications strip a notification
+// just fired — so scripts/demo_engine.py's _redirect_with_notification() carries the real
+// notification (auto-applied, Gate 3 authorized, or Gate 3 declined) here as a query string instead,
+// exactly like dashboard/render_opl.py's own copy of this same relay script (Case 10's equivalent).
+(function() {{
+  var params = new URLSearchParams(window.location.search);
+  var subject = params.get('notif_subject');
+  if (subject) {{
+    try {{
+      window.parent.postMessage({{type: 'notification', notif: {{
+        trigger_label: params.get('notif_trigger') || 'Agent 12 · Change evaluator',
+        subject: subject, body: params.get('notif_body') || '',
+        recipient: params.get('notif_recipient') || 'Project team',
+        channel: params.get('notif_channel') || 'email',
+      }}}}, '*');
+    }} catch (e) {{}}
+    if (window.history && window.history.replaceState) {{
+      window.history.replaceState({{}}, '', window.location.pathname + window.location.hash);
+    }}
+  }}
+}})();
+</script>
 </body></html>"""
     out_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "gate2_queue.html"))
     with open(out_path, "w") as f:

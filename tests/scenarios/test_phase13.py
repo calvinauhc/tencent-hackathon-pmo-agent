@@ -116,36 +116,38 @@ result_free = demo_engine.submit_project_update_freeform(target_ref, "Test Submi
 check("13.4 a freeform update on a non-hardcoded project reaches a real outcome", "error" not in result_free, result_free)
 check("13.4 it's a favorable change (earlier date) so it auto-applies", result_free.get("applied") is True, result_free)
 
-draft_ref = conn.execute("SELECT submission_id FROM projects WHERE status='draft' LIMIT 1").fetchone()["submission_id"]
-result_bad_status = demo_engine.submit_project_update_freeform(draft_ref, "x", "y", "Risk: red")
-check("13.4 a draft project (not yet accepted) is correctly rejected as ineligible for updates",
+# Any status outside accepted/in_progress proves the ineligibility check — §14 rebalanced the trial
+# fixture's status mix (approval rate 20-30%, 5 rows parked in the Gate 2 queue), so this isn't tied
+# to one specific status value that may or may not still exist in that mix.
+ineligible_row = conn.execute("SELECT submission_id FROM projects WHERE status NOT IN ('accepted', 'in_progress') LIMIT 1").fetchone()
+ineligible_ref = ineligible_row["submission_id"]
+result_bad_status = demo_engine.submit_project_update_freeform(ineligible_ref, "x", "y", "Risk: red")
+check("13.4 a non-accepted/in_progress project is correctly rejected as ineligible for updates",
       "error" in result_bad_status and "only accepted or in_progress" in result_bad_status["error"], result_bad_status)
 
 result_no_fields = demo_engine.submit_project_update_freeform(target_ref, "x", "y", "just chatting, no real update here")
 check("13.4 an email with no recognizable fields is rejected, not silently accepted as a no-op",
       "error" in result_no_fields, result_no_fields)
 
-# --- 13.5 the update-compose panel lives in the composer's LEFT panel (moved off topline.html,
-# below "or submit your own"), with a real ghost-text body editor — not on the dashboard anymore. ---
-demo_engine.render_topline()
+# --- 13.5 (§14) the update-compose panel lives in the composer's LEFT panel, with a real ghost-text
+# body editor — the topline dashboard it used to live on is gone entirely now (not just missing this
+# one panel; the whole page is retired). ---
 topline_path = os.path.join(os.path.dirname(__file__), "..", "..", "dashboard", "topline.html")
-with open(topline_path) as f:
-    topline_html = f.read()
-check("13.5 topline no longer renders the update-compose panel (moved to the composer)",
-      'id="update-compose"' not in topline_html)
+check("13.5 the topline dashboard is gone entirely (§14), not just missing the update panel",
+      not os.path.isfile(topline_path))
 
 landing = demo_server.render_landing()
 check("13.5 the composer's left panel has the update-compose panel", 'id="update-compose"' in landing)
 check("13.5 the update panel posts to the real route, targeting the middle panel",
       'action="/project-update/submit"' in landing and 'target="middle-frame"' in landing and 'id="u-form"' in landing)
-check("13.5 the update panel only offers accepted/in_progress projects, not draft/rejected/cancelled ones",
-      "cancelled</option" not in landing and draft_ref not in landing.split('id="update-compose"')[1].split("</select>")[0])
+check("13.5 the update panel only offers accepted/in_progress projects, not the ineligible one above",
+      ineligible_ref not in landing.split('id="update-compose"')[1].split("</select>")[0])
 check("13.5 the update panel's body uses the ghost-text editor (fixed label + greyed-out hint)",
       'id="u-body-editable"' in landing and 'class="lbl" contenteditable="false"' in landing)
 check("13.5 the intake 'or submit your own' box also uses the ghost-text editor",
       'id="c-body-editable"' in landing and 'id="c-form"' in landing)
 
-check("13.6 the composer's right panel has a Revert back button", 'id="revert-btn"' in landing and "Revert back" in landing)
+check("13.6 the composer's top notifications strip has a Revert back button", 'id="revert-btn"' in landing and "Revert back" in landing)
 check("13.6 the revert button posts to the real /reset route, targeting the whole page", 'action="/reset"' in landing and 'target="_top"' in landing)
 
 # --- 13.7 both ghost-text editors' assembled-text format (only "filled" rows join as "Label: value"
@@ -192,7 +194,13 @@ statuses_after = {r["status"] for r in conn2.execute("SELECT status FROM project
 check("13.8 the DB actually has 20 fresh rows post-reset", count_after == 20, count_after)
 check("13.8 no cancelled projects survive a reset — back to the pristine seed", "cancelled" not in statuses_after, statuses_after)
 check("13.8 the stale visualizer artifact was deleted", not os.path.isfile(stale_path))
-check("13.8 topline.html was regenerated fresh", os.path.isfile(topline_path))
+gate2_queue_path = os.path.join(os.path.dirname(__file__), "..", "..", "dashboard", "gate2_queue.html")
+check("13.8 the standalone Gate 2 queue page was regenerated fresh", os.path.isfile(gate2_queue_path))
+statuses_count_after = {}
+for r in conn2.execute("SELECT status FROM projects").fetchall():
+    statuses_count_after[r["status"]] = statuses_count_after.get(r["status"], 0) + 1
+check("13.8 the reseeded fixture still has exactly 5 rows in this week's Gate 2 batch (§14)",
+      statuses_count_after.get("analysis") == 5, statuses_count_after)
 
 print()
 passed = sum(1 for _, s in results if s == "PASS")

@@ -18,9 +18,8 @@ def main(scenario_key):
         print(n["body"][:200])
 
     p, c = result["paths"], result["counts"]
-    print(f"\nRendered:\n  {p['topline']} ({c['projects']} projects)\n  {p['visualizer']} ({c['steps']} steps)\n"
-          f"  {p['comments']} ({c['comments']} comments)\n  {p['notifications']} ({c['notifications']} notifications)\n"
-          f"  {p['activity']} ({c['activity']} activity events)")
+    print(f"\nRendered:\n  {p['visualizer']} ({c['steps']} steps)\n"
+          f"  {p['notifications']} ({c['notifications']} notifications)")
 
 if __name__ == "__main__":
     key = sys.argv[1] if len(sys.argv) > 1 else "6_change_request_stakeholder_flag"

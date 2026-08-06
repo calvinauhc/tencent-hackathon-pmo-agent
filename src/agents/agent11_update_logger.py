@@ -79,7 +79,7 @@ def log_update(conn, project, submitted_fields: dict, submitted_by=None, note=No
 # without needing an LLM call for something this structured.
 UPDATE_RISK_VALUES = {"green", "yellow", "red"}
 
-# Shown in the compose box (scripts/demo_engine.py, dashboard/render_topline.py) and matched exactly
+# Shown in the compose box (scripts/demo_engine.py, scripts/demo_server.py) and matched exactly
 # by parse_update_email() below — defined here, not duplicated in either UI-facing module, so the
 # placeholder text and the parser it documents can never drift apart.
 UPDATE_BODY_PLACEHOLDER = (

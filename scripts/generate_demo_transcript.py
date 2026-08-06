@@ -10,9 +10,8 @@ from src.db.client import get_connection
 from src.db.repositories import insert_project, write_comment
 from src.db.trial_loader import load_trial_data
 from src.orchestration.pipeline import run_submission
-from dashboard.render_topline import render as render_topline
 from dashboard.render_visualizer import render as render_visualizer
-from dashboard.render_comments import render as render_comments
+from dashboard.render_gate2_queue import render as render_gate2_queue
 from scripts.run_demo import SCENARIO_MOCKS
 
 def main():
@@ -32,9 +31,8 @@ def main():
     pid = trace.get("project_id", target.submission_id)
     write_comment(conn, pid, "Priya Sharma", "pmo", "Accept — confirm data handling plan before launch.", False, "gate2")
     write_comment(conn, pid, "Wei Ling Tan", "regulatory", "This touches EU customer data — confirm a GDPR review is scheduled before go-live.", True, None)
-    t_path, t_count = render_topline()
     v_path, v_steps = render_visualizer(pid)
-    c_path, c_count = render_comments(pid)
+    q_path, q_count = render_gate2_queue()
 
     lines = []
     lines.append(f"# Demo run transcript — generated {datetime.datetime.utcnow().isoformat()}Z")
@@ -62,17 +60,15 @@ def main():
     for n in trace["notifications"]:
         lines.append(f"- **{n['subject']}**")
     lines.append("")
-    lines.append("## Beat 5 — Open the topline dashboard")
-    lines.append(f"File: `{os.path.relpath(t_path, os.path.dirname(__file__)+'/..')}`")
-    lines.append(f"{t_count} active projects shown. Point out the 4 metric cards (Total Projects, Portfolio")
-    lines.append("value, Approved rate, Avg success likelihood), the Status + Strategic Alignment distribution")
-    lines.append("panels, the risk-mix strip, the needs-attention panel, and the embedded Periodic Gate 2")
-    lines.append("Review queue below it. Try clicking a table column header to show the sort.")
+    lines.append("## Beat 5 — Open the composer, show the notifications strip + this week's Gate 2 batch")
+    lines.append("Point out: the top notifications strip (moved off the old topline dashboard, §14), and the")
+    lines.append("Periodic Gate 2 Review queue embedded directly in the composer's left panel, listing every")
+    lines.append(f"project sitting at status='analysis' ({q_count} right now). Open one with \"Review & decide\".")
     lines.append("")
-    lines.append("## Beat 6 — Open the comment panel, show the governance split")
-    lines.append(f"File: `{os.path.relpath(c_path, os.path.dirname(__file__)+'/..')}`")
-    lines.append("Point out: PMO composer has Accept/Reject; Wei Ling Tan's flagged concern (stakeholder,")
-    lines.append("no decision power, just a flag) — this is the Manual Gate 3 change-management trigger.")
+    lines.append("## Beat 6 — Show a real Gate 2 decision: Accept, Reject, or Hold")
+    lines.append("Point out: Agent 5/6's findings, then the Accept/Reject/Hold buttons — Wei Ling Tan's flagged")
+    lines.append("concern on this project (stakeholder, no decision power, just a flag) is what routes to the")
+    lines.append("real Manual Gate 3 change-management trigger.")
     lines.append("")
     lines.append("## Beat 7 — Reflection (§ handbook submission checklist requirement)")
     lines.append("One sentence on the CodeBuddy build approach and a development-tool tip — fill in after")

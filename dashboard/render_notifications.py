@@ -51,8 +51,8 @@ def render(project_id):
 
     html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Notifications — {project_id}</title>
 <style>{CSS}</style></head><body>
-<div class="nav"><a href="/" target="_top">← Composer</a><a href="topline.html">Topline</a><a href="activity.html">Activity feed</a>
-<a href="visualizer_{project_id}.html">Execution flow</a><a href="comments_{project_id}.html">Comments</a></div>
+<div class="nav"><a href="/" target="_top">← Composer</a>
+<a href="visualizer_{project_id}.html">Execution flow</a></div>
 <h3>{proj.get('project_name')} — Notifications ({len(notifs)})</h3>
 {items}
 </body></html>"""

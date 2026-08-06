@@ -1,17 +1,26 @@
 """
 In-browser demo composer (§0's simulated-intake decision, §12.1 entry point) — a local-only web
-server (stdlib only, no new dependencies) with a three-panel layout:
-  - Left:   the 7 named scenarios as predrafted "submission emails" (data/trial-projects.json's
-            scenario_index, §12), each with a "Run this case" button.
-  - Middle: an iframe showing whatever's happening — Gate 2 review if a PMO decision is needed, the
-            live execution visualizer once it's resolved, or the topline dashboard by default.
-  - Right:  a live notifications feed, PLUS the Gate 2 decision UI when one is needed. Notifications
-            are not a static list — the visualizer in the middle panel posts a message the instant
-            each notification's triggering step completes during replay, so a card appears here in
-            sync with the graph, not before or after. When a run reaches Manual Gate 2, the decision
-            form (Accept/Reject) opens here too, ABOVE the feed — never in the middle panel — so a
+server (stdlib only, no new dependencies).
+
+Layout (§14 restructure — the old topline dashboard, portfolio activity feed, and stakeholder
+Comment & Concern panel are gone; this is what replaced them):
+  - Top:    a full-width notifications strip, PLUS the Gate 2 decision UI when one is needed.
+            Notifications are not a static list — the visualizer posts a message the instant each
+            notification's triggering step completes during replay, so a card appears here in sync
+            with the graph, not before or after. When a run reaches Manual Gate 2, the decision form
+            (Accept/Reject/Hold) opens here too, ABOVE the feed — never in the middle panel — so a
             PMO can make the call without losing sight of the flow graph they were just watching.
-All three panels are drag-resizable (grab the thin divider between them) — widths persist in
+  - Left:   the 7 named scenarios as predrafted "submission emails" (data/trial-projects.json's
+            scenario_index, §12), each with a "Run this case" button — plus the two compose boxes and,
+            below those, the Periodic Gate 2 Review queue (§5.3) embedded directly (dashboard/
+            render_gate2_queue.py's render_queue_fragment()), listing every project sitting at
+            status='analysis' right now, including this week's 5-project batch (§14). This is the one
+            real entry point for "review a queued project and Accept/Reject/Hold it" — the old
+            topline dashboard used to embed the same fragment; it now lives here instead.
+  - Middle: an iframe showing whatever's happening — Gate 2 review if a PMO decision is needed, or
+            the live execution visualizer once it's resolved. No default page (nothing to jump to
+            now that the dashboard/activity feed are gone) — it starts blank until a case runs.
+Both remaining panels are drag-resizable (grab the thin divider between them) — widths persist in
 localStorage across reloads.
 
 Click "Run this case" and it triggers the real pipeline through Agents 1-6, with the middle panel
@@ -41,13 +50,16 @@ from demo_engine import (
     submit_project_update_freeform, reset_demo, get_updatable_projects, UPDATE_BODY_PLACEHOLDER,
     CASE10_EMAIL,
 )
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from src.db.client import get_connection
+from dashboard.render_gate2_queue import render_queue_fragment
 # Note: run_batch_case/review_queued_project/override_queued_project/open_batch/close_batch and
 # their /batch/, /queue/* HTTP routes below are kept fully wired even though the "Periodic Gate 2
 # Review" left-panel dropdown entry that used to trigger cases 8a/8b/9/10 by button is gone (per an
 # explicit ask to move to "the real queue view" instead of demo-seed buttons) — the embedded queue
-# now on topline.html (dashboard/render_topline.py) POSTs to these exact same routes for its own
-# Open batch / Close batch / Review & decide / Pull from queue controls, so none of this backend
-# logic became dead code, only its old one-click seed buttons did.
+# now in the composer's left panel (dashboard/render_gate2_queue.py, §14) POSTs to these exact same
+# routes for its own Open batch / Close batch / Review & decide / Pull from queue controls, so none
+# of this backend logic became dead code, only its old one-click seed buttons did.
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DASHBOARD_DIR = os.path.join(REPO_ROOT, "dashboard")
@@ -67,34 +79,30 @@ RESOLVED = {}
 PAGE_CSS = """
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
-body{font-family:-apple-system,Helvetica,Arial,sans-serif;color:#1a1a1a}
-#app{display:flex;height:100vh}
+body{font-family:-apple-system,Helvetica,Arial,sans-serif;color:#1a1a1a;display:flex;flex-direction:column;height:100vh}
+#topbar{flex-shrink:0;background:#fafaf8;display:flex;flex-direction:column;max-height:50vh}
+#topbar h3{font-size:13px;margin:0;padding:12px 14px;border-bottom:1px solid #e5e3dc;background:#fff;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+#revert-btn{background:#f1efe8;color:#5f5e5a;border:1px solid #ddd;border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer}
+#revert-btn:hover{background:#e5e3dc;color:#1a1a1a}
+#app{flex:1;display:flex;min-height:0}
 #left{width:360px;flex-shrink:0;overflow-y:auto;padding:1.25rem;background:#fafaf8}
 #left h2{font-size:16px;margin:0 0 4px}
 #left .sub{color:#5f5e5a;font-size:12px;margin-bottom:18px;line-height:1.5}
 #middle{flex:1;display:flex;flex-direction:column;min-width:0}
-#toolbar{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid #e5e3dc;background:#fafaf8;flex-shrink:0}
-#toolbar span{font-size:11px;color:#999;margin-right:4px}
-#toolbar a{font-size:12px;color:#378ADD;text-decoration:none;padding:5px 10px;border-radius:6px;border:1px solid #dceafa}
-#toolbar a:hover{background:#e6f1fb}
 #middle iframe{flex:1;border:none;width:100%}
-#right{width:340px;flex-shrink:0;background:#fafaf8;display:flex;flex-direction:column}
-#right h3{font-size:13px;margin:0;padding:12px 14px;border-bottom:1px solid #e5e3dc;background:#fff;display:flex;align-items:center;justify-content:space-between}
-#revert-btn{background:#f1efe8;color:#5f5e5a;border:1px solid #ddd;border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer}
-#revert-btn:hover{background:#e5e3dc;color:#1a1a1a}
 .resizer{width:6px;flex-shrink:0;cursor:col-resize;background:#e5e3dc;position:relative;transition:background .15s}
 .resizer:hover,.resizer.active{background:#378ADD}
 .resizer::after{content:'';position:absolute;top:0;bottom:0;left:-3px;right:-3px}
 #decision-area:empty{display:none}
-#decision-area{flex-shrink:0;max-height:60vh;overflow-y:auto;border-bottom:3px solid #378ADD;background:#fff}
-#decision-area iframe{width:100%;height:560px;border:none;display:block}
-#notif-feed{flex:1;overflow-y:auto;padding:12px}
+#decision-area{flex-shrink:0;max-height:40vh;overflow-y:auto;border-bottom:3px solid #378ADD;background:#fff}
+#decision-area iframe{width:100%;height:400px;border:none;display:block}
+#notif-feed{display:flex;gap:10px;overflow-x:auto;padding:12px;flex-shrink:0}
 #notif-feed .empty{color:#999;font-size:12px;padding:8px 4px}
-.notifcard{border:1px solid #e5e3dc;border-radius:8px;margin-bottom:10px;overflow:hidden;background:#fff;animation:pop .25s ease-out}
+.notifcard{border:1px solid #e5e3dc;border-radius:8px;overflow:hidden;background:#fff;animation:pop .25s ease-out;flex:0 0 280px;max-height:160px;display:flex;flex-direction:column}
 @keyframes pop {{ from {{ opacity:0; transform:translateY(-4px); }} to {{ opacity:1; transform:translateY(0); }} }}
 .notifcard .nhead{font-size:10px;color:#378ADD;font-weight:600;background:#e6f1fb;padding:5px 10px}
 .notifcard .nsubject{font-size:12px;font-weight:600;padding:8px 10px 0}
-.notifcard .nbody{font-size:11px;color:#444;padding:4px 10px 10px;white-space:pre-wrap;line-height:1.5;max-height:120px;overflow-y:auto}
+.notifcard .nbody{font-size:11px;color:#444;padding:4px 10px 10px;white-space:pre-wrap;line-height:1.5;flex:1;overflow-y:auto}
 .notifcard .nto{font-size:10px;color:#888;padding:0 10px 6px}
 .case{border:1px solid #e5e3dc;border-radius:10px;margin-bottom:12px;overflow:hidden;background:#fff}
 .case .head{background:#f5f4f0;padding:10px 12px}
@@ -128,6 +136,36 @@ button:hover{background:#2c6fb3}
 .uline .lbl{color:#2a2a28}
 .uline .ghost{color:#a8a49a}
 .uline .filled{color:#2a2a28}
+/* Periodic Gate 2 Review queue (dashboard/render_gate2_queue.py's render_queue_fragment()),
+   embedded directly here instead of on the now-removed topline dashboard (§14). Scoped under
+   #queue-embed since the fragment's own class names (table/th/td/.badge/.empty/button) would
+   otherwise clash with — or get overridden by — this page's existing generic rules. */
+#queue-embed{margin-top:8px}
+#queue-embed table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px}
+#queue-embed th{text-align:left;color:#5f5e5a;font-weight:400;font-size:11px;padding:6px 4px;border-bottom:1px solid #ddd}
+#queue-embed td{padding:6px 4px;border-bottom:1px solid #eee;vertical-align:top}
+#queue-embed .badge{font-size:11px;padding:2px 8px;border-radius:6px}
+#queue-embed .green{background:#eaf3de;color:#3b6d11}
+#queue-embed .yellow{background:#faeeda;color:#854f0b}
+#queue-embed .red{background:#fcebeb;color:#a32d2d}
+#queue-embed .gray{background:#f1efe8;color:#5f5e5a}
+#queue-embed .banner{background:#e6f1fb;border:1px solid #378ADD;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px}
+#queue-embed .banner b{color:#1a5a92}
+#queue-embed .batch-status{display:flex;justify-content:space-between;align-items:center;background:#f5f4f0;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;flex-wrap:wrap;gap:8px}
+#queue-embed .batch-status form{margin:0}
+#queue-embed .rollups{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:16px}
+#queue-embed .rollup{border-radius:8px;padding:10px 12px;font-size:11px;line-height:1.5}
+#queue-embed .rollup.ok{background:#eaf3de;border:1px solid #a8d18d}
+#queue-embed .rollup.over{background:#fdf2f2;border:1px solid #f0c9c9}
+#queue-embed .rollup .region{font-weight:600;font-size:12px;margin-bottom:4px}
+#queue-embed .rollup.ok .region{color:#3b6d11}
+#queue-embed .rollup.over .region{color:#a32d2d}
+#queue-embed .override-form{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+#queue-embed .override-form input{font-size:11px;border:1px solid #ddd;border-radius:4px;padding:3px 6px;width:100px}
+#queue-embed .override-form button{padding:3px 8px;font-size:11px;background:#ef9f27}
+#queue-embed .override-form button:hover{background:#d98a1a}
+#queue-embed .empty{color:#888;font-size:12px;padding:14px;text-align:center}
+#queue-embed h3{font-size:12px;margin:10px 0 6px}
 """
 
 # Ghost-text body editor (shared by "or submit your own" and "or send a project update"): parses a
@@ -268,12 +306,12 @@ response in demo mode (no ANTHROPIC_API_KEY); set that env var and they judge it
     # "The list is an interactive database" — pick any accepted/in_progress project (real, live DB
     # state via get_updatable_projects(), not the trial-data snapshot) and send it a real update
     # email, parsed by Agent 11's own deterministic parser (src/agents/agent11_update_logger.py's
-    # parse_update_email()). Moved here from dashboard/render_topline.py's middle-panel dashboard —
-    # this is the left panel's other real entry point now, right below "or submit your own", not a
-    # dashboard widget. target="middle-frame" so the result (auto-applied -> topline, or escalated ->
-    # a real Manual Gate 3) shows in the middle panel exactly like every other left-panel action, and
-    # notifications still surface in the right panel via the same _redirect_with_notification() relay
-    # Case 8/9 use (see topline.html's own script for the receiving half of that relay).
+    # parse_update_email()). Moved here from the (now-removed) topline dashboard's middle-panel
+    # widget — this is the left panel's other real entry point now, right below "or submit your own".
+    # target="middle-frame" so the result (auto-applied, or escalated to a real Manual Gate 3) shows
+    # in the middle panel exactly like every other left-panel action, and notifications still surface
+    # in the top notifications strip via the same _redirect_with_notification() relay Case 8/9 use
+    # (see dashboard/render_gate2_queue.py's own copy of that relay script).
     updatable_rows = get_updatable_projects()
     update_options = "".join(
         f'<option value="{html.escape(r["project_id"] or r["submission_id"])}" '
@@ -307,38 +345,42 @@ real Manual Gate 3 for PMO to accept, decline, or cancel the project.</div>
 '''}
 </div>"""
 
+    # Periodic Gate 2 Review queue (§5.3, §14) — embedded directly in the left panel now that the
+    # topline dashboard that used to hold it is gone. Same render_queue_fragment() computation the
+    # standalone gate2_queue.html page uses (see that module's docstring) — never two copies of this
+    # logic that could drift apart.
+    queue_fragment, queue_len = render_queue_fragment(get_connection())
+    queue_section = f"""
+<div class="divider"><div class="line"></div><span>this week's Gate 2 batch{f' ({queue_len} pending)' if queue_len else ''}</span><div class="line"></div></div>
+<div id="queue-embed">{queue_fragment}</div>"""
+
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>PMO Intake — Composer</title>
 <style>{PAGE_CSS}</style></head><body>
+<div id="topbar">
+  <h3>📧 Notifications
+    <form method="POST" action="/reset" target="_top" style="margin:0" onsubmit="return confirm('Revert the demo? This wipes and reseeds the database and clears everything run so far.');">
+      <button type="submit" id="revert-btn">↺ Revert back</button>
+    </form>
+  </h3>
+  <div id="decision-area"></div>
+  <div id="notif-feed"><div class="empty">Nothing sent yet — run a case and this fills in as the flow reaches each notification step.</div></div>
+</div>
 <div id="app">
   <div id="left">
     <h2>PMO Project Intake — composer</h2>
     <div class="sub">Choose a case, or compose your own below, then run it through the real agent
     pipeline. Middle panel shows the flow — Gate 2 review if a PMO decision is needed, then the live
-    execution graph. Right panel fills in with each notification the instant its step fires during
-    replay.</div>
+    execution graph. The notifications strip above fills in with each notification the instant its
+    step fires during replay.</div>
     <select id="action-select">{"".join(options)}</select>
     {"".join(panels)}
     {compose_section}
     {update_section}
+    {queue_section}
   </div>
   <div class="resizer" id="resize-left" title="Drag to resize"></div>
   <div id="middle">
-    <div id="toolbar">
-      <span>Jump to:</span>
-      <a href="/dashboard/topline.html" target="middle-frame">🏠 Portfolio Dashboard</a>
-      <a href="/dashboard/activity.html" target="middle-frame">📋 Activity Feed</a>
-    </div>
-    <iframe name="middle-frame" id="middle-frame" src="/dashboard/topline.html"></iframe>
-  </div>
-  <div class="resizer" id="resize-right" title="Drag to resize"></div>
-  <div id="right">
-    <h3>📧 Notifications
-      <form method="POST" action="/reset" target="_top" style="margin:0" onsubmit="return confirm('Revert the demo? This wipes and reseeds the database and clears everything run so far.');">
-        <button type="submit" id="revert-btn">↺ Revert back</button>
-      </form>
-    </h3>
-    <div id="decision-area"></div>
-    <div id="notif-feed"><div class="empty">Nothing sent yet — run a case and this fills in as the flow reaches each notification step.</div></div>
+    <iframe name="middle-frame" id="middle-frame"></iframe>
   </div>
 </div>
 <script>
@@ -462,17 +504,15 @@ initGhostEditor('u-body-editable', 'u-body', 'u-form');
   fillFromSelection();
 }})();
 
-// Draggable panel resizing — left/right panels remember their width in localStorage (this is a
-// real local page in a real browser, not a sandboxed artifact preview, so persisting the layout
-// across reloads is safe and just a convenience). Middle panel always fills whatever's left via
-// flex:1, so only left/right need explicit widths.
+// Draggable panel resizing — the left panel remembers its width in localStorage (this is a real
+// local page in a real browser, not a sandboxed artifact preview, so persisting the layout across
+// reloads is safe and just a convenience). Middle panel always fills whatever's left via flex:1, so
+// only left needs an explicit width. (The right panel this used to also resize is gone — §14 moved
+// its contents to the top notifications strip, which spans the full width and isn't resized.)
 (function() {{
   const leftPanel = document.getElementById('left');
-  const rightPanel = document.getElementById('right');
   const savedLeft = localStorage.getItem('pmo_composer_left_width');
-  const savedRight = localStorage.getItem('pmo_composer_right_width');
   if (savedLeft) leftPanel.style.width = savedLeft + 'px';
-  if (savedRight) rightPanel.style.width = savedRight + 'px';
 
   function makeResizable(handle, panel, side, storageKey, minWidth, maxWidth) {{
     handle.addEventListener('mousedown', function(e) {{
@@ -502,7 +542,6 @@ initGhostEditor('u-body-editable', 'u-body', 'u-form');
     }});
   }}
   makeResizable(document.getElementById('resize-left'), leftPanel, 'left', 'pmo_composer_left_width', 240, 720);
-  makeResizable(document.getElementById('resize-right'), rightPanel, 'right', 'pmo_composer_right_width', 240, 720);
 }})();
 
 // Dropdown swaps which panel is visible — purely client-side, every underlying form/route below
@@ -637,7 +676,7 @@ class Handler(BaseHTTPRequestHandler):
                 form.get("project_ref", ""), form.get("from", ""), form.get("subject", ""), form.get("body", ""),
             )
             if "error" in result:
-                self._send_html(f"<h3>{html.escape(result['error'])}</h3><p><a href='/dashboard/topline.html' target='_top'>Back to dashboard</a></p>", 400)
+                self._send_html(f"<h3>{html.escape(result['error'])}</h3><p><a href='/' target='_top'>Back to composer</a></p>", 400)
                 return
             self._redirect(result["redirect"])
             return

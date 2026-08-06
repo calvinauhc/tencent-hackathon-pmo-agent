@@ -34,9 +34,9 @@ For the executing coding agent: work phases in order, top to bottom within each 
 
 ## Phase 4 — Dashboard and visualizer (UX & Demo)
 
-- [x] **4.1** Topline dashboard (§9): metric cards, risk-mix strip, project table, needs-attention panel. *Acceptance*: matches the reference layout in §9; a red project's `help_needed` text is visible with no click. *Depends on*: 3.2.
+- [x] **4.1** ~~Topline dashboard (§9): metric cards, risk-mix strip, project table, needs-attention panel.~~ Built, then REMOVED entirely at explicit user request (TECH-SPEC.md §14's "composer restructure" dated entry, 2026-08-06) — its one surviving piece, the Periodic Gate 2 Review queue, is now embedded directly in the composer's left panel instead.
 - [x] **4.2** Live Execution Visualizer, **replay mode only** for this build (§9.1). Live polling is explicitly deferred, not part of MVP. *Acceptance*: replaying one captured `audit_log` sequence animates the node layout at a demo-readable pace (5s/step). *Depends on*: 2.5.
-- [x] **4.3** Comment and Concern Panel (§9.2). *Acceptance*: PMO composer can attach Accept/Reject to a gate; stakeholder composer only exposes the flag-a-concern toggle, no decision controls. *Depends on*: 2.1, 4.1.
+- [x] **4.3** ~~Comment and Concern Panel (§9.2).~~ Built, then REMOVED entirely at the same explicit request as 4.1 — the PMO-decision half survives as Gate 2/3's real Accept/Reject/Cancel/Hold buttons; the stakeholder flag-a-concern half has no replacement.
 - [x] **4.4** Demo composer entry point (§12.1). *Acceptance*: pasting any of the 7 scenario emails and submitting triggers a real run visible through 4.1–4.2. *Depends on*: 3.2, 4.1, 4.2.
 
 ## Phase 5 — Extensions (cut first if behind schedule)

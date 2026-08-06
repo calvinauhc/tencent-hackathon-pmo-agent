@@ -137,8 +137,8 @@ check("8.8 complete_project()'s redirect carries the notification as query param
 opl_page_path = os.path.join(os.path.dirname(__file__), "..", "..", "dashboard", "opl_PRJ-2026-0791.html")
 with open(opl_page_path) as f:
     opl_html = f.read()
-check("8.8 the OPL page carries the notif_* relay script, so the composer's right panel actually "
-      "sees the notification (the redirect target, not topline.html, needed its own copy)",
+check("8.8 the OPL page carries the notif_* relay script, so the composer's top notifications strip "
+      "actually sees the notification (the redirect target needed its own copy of that relay)",
       "notif_subject" in opl_html and "window.parent.postMessage" in opl_html)
 
 print()

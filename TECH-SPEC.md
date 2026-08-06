@@ -391,6 +391,12 @@ Auto-drafted notification text (Agent 3, 7, 8) should also pass a lightweight to
 
 ## 9. Dashboard (Agent 9)
 
+> **Superseded (§14's "composer restructure" dated entry, 2026-08-06).** The topline dashboard
+> described below — metric cards, distribution panels, risk-mix strip, needs-attention panel, and
+> per-project table — was removed entirely at explicit user request. Its one surviving piece, the
+> Periodic Gate 2 Review queue, now lives embedded in the composer's left panel instead. This section
+> is kept as the original design intent and build history, not current behavior.
+
 - Two viewer groups per brief: **Technical** (Operations, Regulatory, Quality, Engineering, R&D) and **Commercial** (Finance, Sales, Marketing) — MVP: both are read-only; only PMO role can act on gates. **[ASSUMPTION]**
 - Columns: region, business unit, size of price (USD), risk indicator (RYG), schedule status (RYG), resource indicator (RYG, §5.2 — team/staffing availability), CAPEX (USD + % funded), help-needed (open text).
 - Filters: region, BU, risk color, status.
@@ -454,6 +460,11 @@ Purpose: make the pipeline's black box visible during the live demo — a projec
 
 ## 9.2 Comment and Concern Panel — new, not in brief
 
+> **Superseded (§14's "composer restructure" dated entry, 2026-08-06).** This panel was removed
+> entirely at explicit user request. The PMO-decision half of the permission split below survives as
+> Gate 2/3's real Accept/Reject/Cancel/Hold buttons; the stakeholder flag-a-concern half has no
+> replacement. Kept as design history, not current behavior.
+
 Opens from the same project-row drill-down as §9.1. Two distinct comment types, matching the permission model already locked in §9 (only PMO acts on gates; other stakeholders are read-only except for flagging):
 
 - **PMO comments** can carry a decision (Accept/Reject) and post directly to the relevant Manual Gate — this is how Gate 2's "Accept/Reject with comments" (per brief) actually gets entered, not a separate form bolted on afterward.
@@ -466,6 +477,12 @@ Opens from the same project-row drill-down as §9.1. Two distinct comment types,
 §9.1/§9.2 above describe the original UX intent. This section documents the **exact interaction model actually built and demo-tested** against the local MVP (`scripts/demo_server.py`, `dashboard/render_visualizer.py`, `dashboard/render_gate2.py`) — several details evolved past the original plan through real usage (a genuine Manual Gate 2 pause, a decision UI that never interrupts the flow view, cross-frame notification sync). Per PORTING.md item 4, the Next.js dashboard (§15) is a **reimplementation of this exact UX in React**, not a new design — this section is the spec for that port.
 
 ### 9.3.1 Three-panel layout
+
+> **Superseded (§14's "composer restructure" dated entry, 2026-08-06).** The RIGHT panel (decision
+> area + notification feed) below moved to a full-width strip at the TOP of the page instead, and the
+> MIDDLE panel's toolbar jump links are gone (nothing left to jump to). It's a two-panel LEFT/MIDDLE
+> layout now, with the Periodic Gate 2 Review queue embedded at the bottom of the LEFT panel. Kept as
+> build history below, not current behavior.
 
 ```
 ┌───────────────┬─────────────────────────────────────┬───────────────────┐
@@ -637,9 +654,12 @@ One artifact, not two. The submission video (3–5 min, required per the handboo
 
 **Composer left panel** (added post-brief, docs/comparing-foos-repo.md): the 7 named scenarios plus Case 8/9/10 (post-acceptance change management — Agents 11/12, split into a favorable/auto-apply case and an unfavorable/Gate-3 case — and Case 10's project completion via Agent 13) are one dropdown of 10 options, each one case/one outcome. All three of Case 8/9/10 present as a real From/Subject/Body update email from the project originator (Grace Lim, matching cases 1-7's own persona), the same markup pattern (`scripts/demo_server.py`'s `.mail`/`.line`/`.body` classes) — Case 10's email (`demo_engine.py`'s `CASE10_EMAIL`) reports the project is done and asks PMO to close it out, which is what triggers Agent 13's OPL composition (§7.2.3), not PMO or an agent deciding unilaterally. Below the dropdown are two real compose boxes (§14's dated update), both using a shared ghost-text body editor (`scripts/demo_server.py`'s `_ghost_editor_rows()`/`initGhostEditor()`): the label before each colon is real, fixed text (`contenteditable="false"`) you can't type over or delete, and only the hint after it is greyed-out ghost text that clears the instant you click into the row — built from the same placeholder constants the real parsers document (`FREEFORM_BODY_PLACEHOLDER`, `UPDATE_BODY_PLACEHOLDER`), so the on-screen hint and the parser it documents can never drift apart.
 - **"or submit your own"** (From/Subject/Body) — the literal fulfillment of this section's "paste a submission" line above, which the original build only satisfied via predrafted cards, not free text. Runs through the real pipeline via Agent 1's `parse_intake()` (deterministic fallback in demo mode).
-- **"or send a project update"** — §7.2.1's "the list is an interactive database" capability, moved here from the topline dashboard (§9's dated note): pick any real accepted/in_progress project (live DB state via `demo_engine.get_updatable_projects()`, not a fixed list) and submit a typed update email through Agent 11's real parser and Agent 12's real evaluation, `target="middle-frame"` so the result (auto-applied, or a real Manual Gate 3) shows in the middle panel like every other left-panel action.
+- **"or send a project update"** — §7.2.1's "the list is an interactive database" capability, moved here from the (now-removed, §14) topline dashboard: pick any real accepted/in_progress project (live DB state via `demo_engine.get_updatable_projects()`, not a fixed list) and submit a typed update email through Agent 11's real parser and Agent 12's real evaluation, `target="middle-frame"` so the result (auto-applied, or a real Manual Gate 3) shows in the middle panel like every other left-panel action.
+- **"this week's Gate 2 batch"** (§14) — below the update box, the Periodic Gate 2 Review queue (§5.3) embedded directly via `dashboard/render_gate2_queue.py`'s `render_queue_fragment()`, re-rendered live on every composer page load. Lists every project sitting at `status='analysis'` right now, including the 5-row weekly batch §14's trial-data rebalance seeded — the one real place to Open/Close a batch, Review & decide, or Pull a project from the queue with a logged override reason. Batch-level actions (Open/Close) reload the whole composer (`target="_top"`) so this embed comes back fresh; a per-project decision (Review & decide, Pull from queue) still opens in the middle panel like every other action.
 
-The periodic Gate 2 review batch cases (8a/8b/9/10 in §12's abstract test enumeration above — a different "8/9/10," see that section's numbering note) no longer have composer buttons of their own; that queue is embedded directly on the topline dashboard instead (§9, §14).
+The periodic Gate 2 review batch cases (8a/8b/9/10 in §12's abstract test enumeration above — a different "8/9/10," see that section's numbering note) don't have composer dropdown buttons of their own; that queue is the "this week's Gate 2 batch" embed described just above, not the old topline dashboard (§14 — that page is gone).
+
+**Top notifications strip (§14, replaces the old right panel and the middle panel's "Jump to" toolbar):** a full-width strip above the two remaining panels — live notifications feed, the "↺ Revert back" reset button, and (only while a decision is pending) the Gate 2/3 decision iframe, opened ABOVE the feed so a PMO never loses sight of the flow graph they were watching. Nothing left to "jump to" now that the topline dashboard and activity feed are gone, so the strip carries no nav links — just notifications.
 
 **Sequencing**:
 1. Get composer → visualizer → dashboard stable end to end first.
@@ -674,6 +694,57 @@ All 5 items exist under `data/`: `playbook.md`, `pvp.md`, `political.md`, `regul
 - The "Send a project update" panel moved OFF the topline dashboard and into the composer's left panel, below "or submit your own" (§9, §12.1) — target="middle-frame" so results still show in the middle panel and notifications still surface in the right panel via the same relay Case 8/9 use. Both compose boxes now share a ghost-text body editor (label real/fixed, hint greyed-out and clears on click, §12.1) instead of a plain placeholder attribute — `FREEFORM_BODY_PLACEHOLDER` was reshaped from a two-fields-per-line format into one "Label: <hint>" per line to fit (confirmed harmless: `_deterministic_fallback_parse()`'s regexes were never line-bound for the split fields, and never used the dropped "— department, region" suffix in the first place).
 - Topline's Status Distribution dropped the duplicate-vs-other rejection split (single "Rejected" bucket — low value for a portfolio-level view) and its Strategic Alignment Distribution was replaced by real governance panels (§9): CAPEX Funding Coverage, Predictive Portfolio Health, and Portfolio Value by Business Unit — all computed from real existing fields. A fourth panel, Strategic Coverage (Aligned vs Orphaned, from Agent 6's alignment verdict), was built the same pass and then removed at the user's request (`get_latest_agent_payload` no longer imported in `dashboard/render_topline.py`). Three additional requested metrics (Allocation Variance, CapEx/OpEx Ratio, Cross-Functional Dependency Resolution Time) were never built at all — no field in this schema (§3) backs any of them, and fabricating numbers would break this project's "never guess" discipline.
 - Case 10 restyled to match Case 8/9: a real "project complete, please close out" update email from the originator (`scripts/demo_engine.py`'s `CASE10_EMAIL`, §7.2.3/§12.1) instead of descriptive prose behind a generic button. `complete_project()` now sends a real notification back to that same originator once Agent 13 publishes the OPL — a new `opl_published()` template (`src/notifications/templates.py`, §7.2.3) naming the project and giving the real `/dashboard/opl_<id>.html` link — and routes through the same `_redirect_with_notification()` relay Case 8/9 already use. Since Case 10's redirect target is the OPL page, not `topline.html`, `dashboard/render_opl.py`'s generated page needed its own copy of the `notif_*`-reading relay script for the notification to actually reach the composer's right panel.
+- **§14 rebalance — trial-data status mix + a real "this week's batch" (2026-08-06):** the topline
+  dashboard's Approved rate metric read 79% (11 of 14 decided proposals approved), too high to be a
+  realistic PMO governance story — rebalanced `trial-projects.json` so it reads 29%: 7 of the 11
+  previously accepted/in_progress/completed rows not anchoring a named scenario (§12) were rewritten
+  as rejected proposals instead (varied real reasons — low margin vs CAPEX, misaligned focus area,
+  unquantified regulatory risk), leaving 4 accepted-ish rows (the 3 scenario-anchor projects plus
+  PRJ-2026-0842) against 10 rejected. Separately, exactly 5 rows now sit at `status='analysis'` —
+  "this week's Gate 2 batch" — so the periodic-review queue (§5.3) always has real material to
+  test Accept/Reject/Hold against: the 2 that already sat there, plus 2 former `draft` rows and 1
+  former `pmo_review` row (the borderline-duplicate scenario 7 target — a natural fit, since
+  "awaiting LLM adjudication" already meant "not yet decided"). A real gap this surfaced: rows seeded
+  directly into `analysis` never actually ran through Agent 5/6 (`insert_project()` is a raw seed
+  insert, not a pipeline run), so `_reconstruct_gate2_trace()` — what "Review & decide" and "Pull from
+  queue" both call — would have failed with "Could not reconstruct Agent 5/6 findings" the instant a
+  PMO tried to open one. Fixed with `scripts/demo_engine.py`'s new `QUEUE_SEED_MOCKS` +
+  `_seed_queue_agent_payloads()`, called at every seed site (`run_scenario`, `run_scenario_to_gate2`,
+  `_ensure_seeded`, `reset_demo`) — one plausible, clearly-synthetic audit_log entry per analysis-status
+  row, verdicts deliberately mixed (aligned/misaligned/inconclusive) so all three real outcomes have a
+  genuine candidate.
+- **§14 composer restructure (2026-08-06):** the topline dashboard, portfolio activity feed, and
+  stakeholder Comment & Concern panel (§9, §9.1's nav, §9.2) are REMOVED entirely, at explicit user
+  request — `dashboard/render_topline.py`, `render_activity.py`, and `render_comments.py` are deleted,
+  along with every `topline.html`/`activity.html`/`comments_*.html` link and the `render_topline()`/
+  `render_activity()`/`render_comments()` calls that generated them. What survived each, and where it
+  went:
+  - The Periodic Gate 2 Review queue (topline's one genuinely load-bearing piece) is now embedded
+    directly in the composer's LEFT panel (`scripts/demo_server.py`'s `render_landing()`, reading
+    `dashboard/render_gate2_queue.py`'s `render_queue_fragment()` live on every page load) — below "or
+    send a project update," under a "this week's Gate 2 batch (N pending)" divider. Its Open/Close-batch
+    forms now `target="_top"` (a full composer reload, since there's no middle-frame-shaped dashboard to
+    refresh into anymore) while Review & decide / Pull from queue keep `target="middle-frame"` (a
+    per-project decision still belongs in the flow panel, not a full-page jump). The standalone
+    `gate2_queue.html` page stays, both for direct linking and as the landing page for actions that
+    don't have a live composer to refresh back into (a Hold decision, or a change-management redirect)
+    — it picked up its own copy of the `notif_*`-reading relay script (previously only on `topline.html`
+    and `render_opl.py`) so Case 8/9's notifications and a plain project update still reach the
+    composer once their redirect target changed from `topline.html` to `gate2_queue.html`.
+  - The Notifications feed (+ Revert back button + the Gate 2/3 decision iframe) moved from a
+    right-hand panel to a full-width strip at the TOP of the page, replacing the old middle-panel
+    toolbar's "Jump to: Portfolio Dashboard / Activity Feed" links — there's nothing left to jump to,
+    so the strip is notifications-only, no nav links. The middle panel's iframe has no default page
+    anymore (it starts blank until a case runs) since the page it used to default to is gone.
+  - The stakeholder Comment & Concern panel (the flag-a-concern textarea, no decision power) has no
+    replacement — it's simply gone. The PMO side of that same permission split survives unaffected:
+    Gate 2's real Accept/Reject/Hold buttons (`dashboard/render_gate2.py`) and Gate 3's real
+    Accept/Reject/Cancel buttons, both unchanged by this restructure.
+  - §9's "topline layout" description, §9.1's nav-link list, §9.2's Comment and Concern Panel, and
+    §9.3.1's three-panel layout diagram below are the ORIGINAL design intent and the MVP's build
+    history — left as-is for the record (and because PORTING.md/§15's Next.js port target may still
+    reference the underlying `project_comments` data model, §3, even with no UI surfacing it in this
+    build) — but they no longer describe what's actually rendered. This bullet is the current truth.
 
 **`trial-projects.json` structure**: `{ scenario_index, projects }`. `projects` is 20 entries spanning all seven `status` values in §3's enum. `scenario_index` maps each of §12's 7 named test scenarios directly to the `project_id`/`submission_id` that demonstrates it — e.g. scenario 6 (change request via stakeholder flag) points straight at PRJ-2026-0842, the same "Smart inventory forecasting agent" project used in the §9.2 comment-panel example, so the trial data and the worked examples in this spec are the same project, not two disconnected fixtures. `tests/scenarios/` (§15) should read fixtures via `scenario_index` rather than hardcoding IDs, so re-generating the dataset doesn't silently break the test suite.
 
