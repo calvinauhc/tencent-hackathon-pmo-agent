@@ -26,8 +26,11 @@ td{padding:8px 6px;border-bottom:1px solid #eee;vertical-align:top}
 .override-form button{padding:3px 8px;font-size:11px;background:#ef9f27}
 .override-form button:hover{background:#d98a1a}
 .empty{color:#888;font-size:13px;padding:20px;text-align:center}
+.queue-details summary{font-size:14px;font-weight:600;margin-bottom:8px;cursor:pointer;color:#1a1a1a;list-style-position:outside}
+.queue-details summary:hover{color:#378ADD}
+.queue-details table{margin-top:10px}
 </style></head><body>
-<div class="nav"><a href="/dashboard/topline.html" target="_top">← Dashboard</a></div>
+<div class="nav"><a href="/" target="_top">← Composer</a></div>
 <div class="banner"><b>Periodic Gate 2 Review (§5.3).</b> Every project here has finished Agent 5/6
 analysis and is waiting for a real Gate 2 decision — reviewed together, weekly by default, so a
 region's budget is seen as one shared pool, not project-by-project blind spots. Sub-$50,000
@@ -35,53 +38,33 @@ projects skip this queue automatically (playbook.md's existing fast-track tier);
 still be pulled out early with a logged reason.</div>
 <div class="batch-status">
   <span>No batch currently open.</span>
-  <form method="POST" action="/queue/open-batch" target="middle-frame"><button type="submit">Open this week's batch</button></form>
+  <form method="POST" action="/queue/open-batch" target="_top"><button type="submit">Open this week's batch</button></form>
 </div>
 <h3 style="font-size:14px;margin-bottom:8px">Regional CAPEX rollup</h3>
 <div class="rollups"><div class="rollup ok">
-  <div class="region">Europe</div>
-  Committed: $560,498 · Queued asks: $26,913<br>
-  If all approved: $587,411 of $650,000 budget<br>
-  Prioritization lens: <b>low-risk / low-CAPEX first</b>
-</div><div class="rollup ok">
   <div class="region">North America</div>
-  Committed: $1,257,000 · Queued asks: $207,492<br>
-  If all approved: $1,464,492 of $1,500,000 budget<br>
+  Committed: $155,000 · Queued asks: $174,998<br>
+  If all approved: $329,998 of $1,500,000 budget<br>
   Prioritization lens: <b>best ROI-ratio first</b>
-</div><div class="rollup over">
+</div><div class="rollup ok">
   <div class="region">Other</div>
-  Committed: $787,815 · Queued asks: $178,177<br>
-  If all approved: $965,992 of $800,000 budget<br>
-  Prioritization lens: <b>low-risk / low-CAPEX first</b><br><b>⚠ Approving everything queued would exceed budget</b>
-</div><div class="rollup over">
+  Committed: $180,000 · Queued asks: $59,326<br>
+  If all approved: $239,326 of $800,000 budget<br>
+  Prioritization lens: <b>best ROI-ratio first</b>
+</div><div class="rollup ok">
   <div class="region">Southeast Asia</div>
-  Committed: $658,628 · Queued asks: $870,182<br>
-  If all approved: $1,528,810 of $1,200,000 budget<br>
-  Prioritization lens: <b>best ROI-ratio first</b><br><b>⚠ Approving everything queued would exceed budget</b>
+  Committed: $100,000 · Queued asks: $53,420<br>
+  If all approved: $153,420 of $1,200,000 budget<br>
+  Prioritization lens: <b>best ROI-ratio first</b>
 </div></div>
-<h3 style="font-size:14px;margin-bottom:8px">Queued projects (16)</h3>
+<details class="queue-details">
+<summary>Queued projects (5)</summary>
 <table><tr><th>Project</th><th style="text-align:right">CAPEX</th><th>Agent 5</th><th>Agent 6</th><th>Actions</th></tr><tr>
-  <td><b>Customer Support Tickets Initiative</b><br>
-  <span style="color:#888;font-size:11px">Europe · Quality</span></td>
-  <td style="text-align:right">$10,218</td>
-  <td>—</td>
-  <td><span class="badge gray">—</span></td>
-  <td>
-    <form method="POST" action="/queue/review/SUB-0018" target="middle-frame" style="margin-bottom:6px">
-      <button type="submit">Review &amp; decide</button>
-    </form>
-    <form method="POST" action="/queue/override/SUB-0018" target="middle-frame" class="override-form">
-      <input type="text" name="reason" placeholder="Override reason..." required>
-      <button type="submit">Pull from queue</button>
-    </form>
-     <span class="badge green">fast-track eligible (&lt;$50,000)</span>
-  </td>
-</tr><tr>
   <td><b>Equipment Maintenance Schedules Initiative</b><br>
   <span style="color:#888;font-size:11px">Other · Regulatory</span></td>
   <td style="text-align:right">$59,326</td>
-  <td>—</td>
-  <td><span class="badge gray">—</span></td>
+  <td>positive</td>
+  <td><span class="badge aligned">aligned</span></td>
   <td>
     <form method="POST" action="/queue/review/SUB-0025" target="middle-frame" style="margin-bottom:6px">
       <button type="submit">Review &amp; decide</button>
@@ -96,8 +79,8 @@ still be pulled out early with a logged reason.</div>
   <td><b>Vendor Risk Assessments Initiative</b><br>
   <span style="color:#888;font-size:11px">Southeast Asia · Sales</span></td>
   <td style="text-align:right">$16,388</td>
-  <td>—</td>
-  <td><span class="badge gray">—</span></td>
+  <td>unclear</td>
+  <td><span class="badge aligned">aligned</span></td>
   <td>
     <form method="POST" action="/queue/review/SUB-0029" target="middle-frame" style="margin-bottom:6px">
       <button type="submit">Review &amp; decide</button>
@@ -109,112 +92,16 @@ still be pulled out early with a logged reason.</div>
      <span class="badge green">fast-track eligible (&lt;$50,000)</span>
   </td>
 </tr><tr>
-  <td><b>Marketing Content Approval Initiative</b><br>
-  <span style="color:#888;font-size:11px">North America · R&amp;D</span></td>
-  <td style="text-align:right">$11,125</td>
-  <td>—</td>
-  <td><span class="badge gray">—</span></td>
+  <td><b>Supplier delivery timing accuracy agent</b><br>
+  <span style="color:#888;font-size:11px">North America · Engineering</span></td>
+  <td style="text-align:right">$110,000</td>
+  <td>unclear</td>
+  <td><span class="badge aligned">aligned</span></td>
   <td>
-    <form method="POST" action="/queue/review/SUB-0030" target="middle-frame" style="margin-bottom:6px">
+    <form method="POST" action="/queue/review/SUB-0009" target="middle-frame" style="margin-bottom:6px">
       <button type="submit">Review &amp; decide</button>
     </form>
-    <form method="POST" action="/queue/override/SUB-0030" target="middle-frame" class="override-form">
-      <input type="text" name="reason" placeholder="Override reason..." required>
-      <button type="submit">Pull from queue</button>
-    </form>
-     <span class="badge green">fast-track eligible (&lt;$50,000)</span>
-  </td>
-</tr><tr>
-  <td><b>Supplier Lead Times Initiative</b><br>
-  <span style="color:#888;font-size:11px">Southeast Asia · Regulatory</span></td>
-  <td style="text-align:right">$211,163</td>
-  <td>—</td>
-  <td><span class="badge gray">—</span></td>
-  <td>
-    <form method="POST" action="/queue/review/SUB-0033" target="middle-frame" style="margin-bottom:6px">
-      <button type="submit">Review &amp; decide</button>
-    </form>
-    <form method="POST" action="/queue/override/SUB-0033" target="middle-frame" class="override-form">
-      <input type="text" name="reason" placeholder="Override reason..." required>
-      <button type="submit">Pull from queue</button>
-    </form>
-    
-  </td>
-</tr><tr>
-  <td><b>Equipment Maintenance Schedules Initiative</b><br>
-  <span style="color:#888;font-size:11px">Other · Engineering</span></td>
-  <td style="text-align:right">$65,521</td>
-  <td>—</td>
-  <td><span class="badge gray">—</span></td>
-  <td>
-    <form method="POST" action="/queue/review/SUB-0051" target="middle-frame" style="margin-bottom:6px">
-      <button type="submit">Review &amp; decide</button>
-    </form>
-    <form method="POST" action="/queue/override/SUB-0051" target="middle-frame" class="override-form">
-      <input type="text" name="reason" placeholder="Override reason..." required>
-      <button type="submit">Pull from queue</button>
-    </form>
-    
-  </td>
-</tr><tr>
-  <td><b>Cross-Team Project Status Initiative</b><br>
-  <span style="color:#888;font-size:11px">Southeast Asia · Finance</span></td>
-  <td style="text-align:right">$256,883</td>
-  <td>—</td>
-  <td><span class="badge gray">—</span></td>
-  <td>
-    <form method="POST" action="/queue/review/SUB-0091" target="middle-frame" style="margin-bottom:6px">
-      <button type="submit">Review &amp; decide</button>
-    </form>
-    <form method="POST" action="/queue/override/SUB-0091" target="middle-frame" class="override-form">
-      <input type="text" name="reason" placeholder="Override reason..." required>
-      <button type="submit">Pull from queue</button>
-    </form>
-    
-  </td>
-</tr><tr>
-  <td><b>Contract Renewal Dates Initiative</b><br>
-  <span style="color:#888;font-size:11px">Southeast Asia · Regulatory</span></td>
-  <td style="text-align:right">$74,567</td>
-  <td>—</td>
-  <td><span class="badge gray">—</span></td>
-  <td>
-    <form method="POST" action="/queue/review/SUB-0095" target="middle-frame" style="margin-bottom:6px">
-      <button type="submit">Review &amp; decide</button>
-    </form>
-    <form method="POST" action="/queue/override/SUB-0095" target="middle-frame" class="override-form">
-      <input type="text" name="reason" placeholder="Override reason..." required>
-      <button type="submit">Pull from queue</button>
-    </form>
-    
-  </td>
-</tr><tr>
-  <td><b>Marketing Content Approval Initiative</b><br>
-  <span style="color:#888;font-size:11px">North America · Quality</span></td>
-  <td style="text-align:right">$74,348</td>
-  <td>—</td>
-  <td><span class="badge gray">—</span></td>
-  <td>
-    <form method="POST" action="/queue/review/SUB-0027" target="middle-frame" style="margin-bottom:6px">
-      <button type="submit">Review &amp; decide</button>
-    </form>
-    <form method="POST" action="/queue/override/SUB-0027" target="middle-frame" class="override-form">
-      <input type="text" name="reason" placeholder="Override reason..." required>
-      <button type="submit">Pull from queue</button>
-    </form>
-    
-  </td>
-</tr><tr>
-  <td><b>Warehouse Teams Have Initiative</b><br>
-  <span style="color:#888;font-size:11px">Southeast Asia · R&amp;D</span></td>
-  <td style="text-align:right">$209,410</td>
-  <td>—</td>
-  <td><span class="badge gray">—</span></td>
-  <td>
-    <form method="POST" action="/queue/review/SUB-0044" target="middle-frame" style="margin-bottom:6px">
-      <button type="submit">Review &amp; decide</button>
-    </form>
-    <form method="POST" action="/queue/override/SUB-0044" target="middle-frame" class="override-form">
+    <form method="POST" action="/queue/override/SUB-0009" target="middle-frame" class="override-form">
       <input type="text" name="reason" placeholder="Override reason..." required>
       <button type="submit">Pull from queue</button>
     </form>
@@ -222,99 +109,60 @@ still be pulled out early with a logged reason.</div>
   </td>
 </tr><tr>
   <td><b>Supplier Lead Times Initiative</b><br>
-  <span style="color:#888;font-size:11px">North America · Operations</span></td>
-  <td style="text-align:right">$17,995</td>
-  <td>—</td>
-  <td><span class="badge gray">—</span></td>
-  <td>
-    <form method="POST" action="/queue/review/SUB-0045" target="middle-frame" style="margin-bottom:6px">
-      <button type="submit">Review &amp; decide</button>
-    </form>
-    <form method="POST" action="/queue/override/SUB-0045" target="middle-frame" class="override-form">
-      <input type="text" name="reason" placeholder="Override reason..." required>
-      <button type="submit">Pull from queue</button>
-    </form>
-     <span class="badge green">fast-track eligible (&lt;$50,000)</span>
-  </td>
-</tr><tr>
-  <td><b>Manual Data Entry Initiative</b><br>
-  <span style="color:#888;font-size:11px">Europe · Marketing</span></td>
-  <td style="text-align:right">$16,695</td>
-  <td>—</td>
-  <td><span class="badge gray">—</span></td>
-  <td>
-    <form method="POST" action="/queue/review/SUB-0053" target="middle-frame" style="margin-bottom:6px">
-      <button type="submit">Review &amp; decide</button>
-    </form>
-    <form method="POST" action="/queue/override/SUB-0053" target="middle-frame" class="override-form">
-      <input type="text" name="reason" placeholder="Override reason..." required>
-      <button type="submit">Pull from queue</button>
-    </form>
-     <span class="badge green">fast-track eligible (&lt;$50,000)</span>
-  </td>
-</tr><tr>
-  <td><b>Invoice Reconciliation Between Initiative</b><br>
   <span style="color:#888;font-size:11px">North America · Finance</span></td>
-  <td style="text-align:right">$57,954</td>
-  <td>—</td>
-  <td><span class="badge gray">—</span></td>
+  <td style="text-align:right">$64,998</td>
+  <td>unclear</td>
+  <td><span class="badge misaligned">misaligned</span></td>
   <td>
-    <form method="POST" action="/queue/review/SUB-0066" target="middle-frame" style="margin-bottom:6px">
+    <form method="POST" action="/queue/review/SUB-0014" target="middle-frame" style="margin-bottom:6px">
       <button type="submit">Review &amp; decide</button>
     </form>
-    <form method="POST" action="/queue/override/SUB-0066" target="middle-frame" class="override-form">
+    <form method="POST" action="/queue/override/SUB-0014" target="middle-frame" class="override-form">
       <input type="text" name="reason" placeholder="Override reason..." required>
       <button type="submit">Pull from queue</button>
     </form>
     
   </td>
 </tr><tr>
-  <td><b>Marketing Content Approval Initiative</b><br>
-  <span style="color:#888;font-size:11px">Other · Quality</span></td>
-  <td style="text-align:right">$53,330</td>
-  <td>—</td>
-  <td><span class="badge gray">—</span></td>
+  <td><b>Regulatory Filings Are Initiative</b><br>
+  <span style="color:#888;font-size:11px">Southeast Asia · Marketing</span></td>
+  <td style="text-align:right">$37,032</td>
+  <td>unclear</td>
+  <td><span class="badge inconclusive">inconclusive</span></td>
   <td>
-    <form method="POST" action="/queue/review/SUB-0075" target="middle-frame" style="margin-bottom:6px">
+    <form method="POST" action="/queue/review/SUB-0020" target="middle-frame" style="margin-bottom:6px">
       <button type="submit">Review &amp; decide</button>
     </form>
-    <form method="POST" action="/queue/override/SUB-0075" target="middle-frame" class="override-form">
-      <input type="text" name="reason" placeholder="Override reason..." required>
-      <button type="submit">Pull from queue</button>
-    </form>
-    
-  </td>
-</tr><tr>
-  <td><b>Contract Renewal Dates Initiative</b><br>
-  <span style="color:#888;font-size:11px">North America · Sales</span></td>
-  <td style="text-align:right">$46,070</td>
-  <td>—</td>
-  <td><span class="badge gray">—</span></td>
-  <td>
-    <form method="POST" action="/queue/review/SUB-0088" target="middle-frame" style="margin-bottom:6px">
-      <button type="submit">Review &amp; decide</button>
-    </form>
-    <form method="POST" action="/queue/override/SUB-0088" target="middle-frame" class="override-form">
+    <form method="POST" action="/queue/override/SUB-0020" target="middle-frame" class="override-form">
       <input type="text" name="reason" placeholder="Override reason..." required>
       <button type="submit">Pull from queue</button>
     </form>
      <span class="badge green">fast-track eligible (&lt;$50,000)</span>
-  </td>
-</tr><tr>
-  <td><b>Supplier Lead Times Initiative</b><br>
-  <span style="color:#888;font-size:11px">Southeast Asia · Engineering</span></td>
-  <td style="text-align:right">$101,771</td>
-  <td>—</td>
-  <td><span class="badge gray">—</span></td>
-  <td>
-    <form method="POST" action="/queue/review/SUB-0098" target="middle-frame" style="margin-bottom:6px">
-      <button type="submit">Review &amp; decide</button>
-    </form>
-    <form method="POST" action="/queue/override/SUB-0098" target="middle-frame" class="override-form">
-      <input type="text" name="reason" placeholder="Override reason..." required>
-      <button type="submit">Pull from queue</button>
-    </form>
-    
   </td>
 </tr></table>
+</details>
+<script>
+// Case 8/9 (§7.2 change management) and a plain project-update never run through the Live Execution
+// Visualizer, which is normally what tells the composer's top notifications strip a notification
+// just fired — so scripts/demo_engine.py's _redirect_with_notification() carries the real
+// notification (auto-applied, Gate 3 authorized, or Gate 3 declined) here as a query string instead,
+// exactly like dashboard/render_opl.py's own copy of this same relay script (Case 10's equivalent).
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var subject = params.get('notif_subject');
+  if (subject) {
+    try {
+      window.parent.postMessage({type: 'notification', notif: {
+        trigger_label: params.get('notif_trigger') || 'Agent 12 · Change evaluator',
+        subject: subject, body: params.get('notif_body') || '',
+        recipient: params.get('notif_recipient') || 'Project team',
+        channel: params.get('notif_channel') || 'email',
+      }}, '*');
+    } catch (e) {}
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+    }
+  }
+})();
+</script>
 </body></html>

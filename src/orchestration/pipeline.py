@@ -181,7 +181,7 @@ def resume_after_gate2(conn, project, trace, gate2_decision, override_reason=Non
     a6_out = trace["agent6"]
     batch_meta = {"gate2_batch_id": gate2_batch_id, "exception_reason": exception_reason}
 
-    if gate2_decision == "accept" and a6_out["verdict"] in ("aligned", "partially_aligned"):
+    if gate2_decision == "accept":
         new_status = accept_project(conn, project.submission_id, "accept")
         row = conn.execute("SELECT project_id FROM projects WHERE submission_id = ?", (project.submission_id,)).fetchone()
         # Idempotent, same rule as before: reuse an existing project_id rather than issuing a new

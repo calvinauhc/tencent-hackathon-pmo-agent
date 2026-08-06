@@ -49,8 +49,8 @@ availability is tracked the same way as risk and schedule
 </div>
 <div class="budget-flag ok">
   <div class="headline">✓ Within Southeast Asia's CAPEX budget</div>
-  Committed before this project: $658,628 · After: $718,628 of $1,200,000 budget
-  (45% headroom remaining before this project)<br>
+  Committed before this project: $40,000 · After: $100,000 of $1,200,000 budget
+  (97% headroom remaining before this project)<br>
   Per playbook.md's Portfolio Prioritization policy, this headroom level points to: <b>best ROI-ratio projects first (headroom is comfortable)</b>
 </div>
 
@@ -67,7 +67,7 @@ availability is tracked the same way as risk and schedule
 <div class="accept-panel">
   <label>PMO comment (optional — included in the acceptance notification, e.g. praise or a watch-out to track post-acceptance)</label>
   <textarea id="accept-comment-field" rows="2" placeholder="e.g. great margin story here; keep an eye on the Q3 staffing dependency..."></textarea>
-  <button type="button" class="accept" id="accept-btn" >✓ Accept</button>
+  <button type="button" class="accept" id="accept-btn">✓ Accept</button>
 </div>
 
 <div class="reject-panel">
@@ -94,6 +94,21 @@ function submitDecision(decision) {
   const body = new URLSearchParams();
   if (decision === 'accept') {
     body.set('pmo_comment', document.getElementById('accept-comment-field').value);
+    const overrideField = document.getElementById('override-reason-field');
+    if (overrideField) {
+      const overrideReason = overrideField.value.trim();
+      if (!overrideReason) {
+        statusEl.innerText = '';
+        overrideField.style.border = '2px solid #a32d2d';
+        overrideField.focus();
+        document.getElementById('accept-btn').disabled = false;
+        document.getElementById('reject-btn').disabled = false;
+        document.getElementById('hold-btn').disabled = false;
+        alert('Please fill in a PMO override reason before accepting.');
+        return;
+      }
+      body.set('pmo_override_reason', overrideReason);
+    }
   }
   if (decision === 'reject') {
     body.set('reason', document.getElementById('reason-field').value);
