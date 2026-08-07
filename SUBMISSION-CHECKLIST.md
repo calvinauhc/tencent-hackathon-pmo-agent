@@ -5,11 +5,7 @@ Status legend: [x] ready · [ ] needs a human to do it — nothing here is fake-
 - [ ] **Project title** — draft: "PMO Project Intake & Governance Agent" (confirm before submitting).
 - [ ] **Project image** (16:9, ~380×216px) — not created. Recommend a screenshot of `dashboard/topline.html` or the visualizer mid-replay.
 - [ ] **Short blurb** (under 10 words) — draft: "AI PMO intake and governance, from proposal to dashboard." (9 words — trim if needed).
-- [ ] **Project description** — four required parts, sourced from TECH-SPEC.md:
-  - Project overview / target scenario / value proposition → §13
-  - Real-world scenario insights (pain source, audience, core problem) → §13, Agent brief.md
-  - Solution design (business + technical architecture, how prompts drive generation) → §2, §5, §8, §16
-  - Quantifiable metrics / impact → §13's scaling narrative + real numbers from `dashboard/topline.html` once run against real trial data
+- [x] **Project description** — drafted in `PROJECT-DESCRIPTION.md`, all four required parts, sourced from TECH-SPEC.md §§2/5/8/13/16 and `_markdown/Agent brief.md`. Review before pasting into the submission form — the "251 checks passing" and "29% approval rate" numbers are real (verified against a live test run and `data/trial-projects.json`), but confirm they still hold if the trial data or test suite changes again.
 - [ ] **Demo video** (3-5 min) — shot list ready in `DEMO-TRANSCRIPT.md`, generated from a real run, not scripted fiction. Recording itself is a manual step.
 - [ ] **Product Sharing paragraph** — how CodeBuddy was used, one paragraph. Write this *after* the CodeBuddy port (`PORTING.md`), not before — it needs to be a real account of that experience, not a prediction of one.
 - [ ] **Project link** (optional/bonus) — pending a hosted deployment; not part of this local build.
