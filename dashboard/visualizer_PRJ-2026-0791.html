@@ -51,13 +51,13 @@ line.edge.lit.done,path.edge.lit.done{stroke:#639922}
   text-transform:uppercase;color:#aaa;pointer-events:none}
 </style></head><body>
 <div class="nav"><a href="/" target="_top">← Composer</a>
-<a href="notifications_PRJ-2026-0791.html">Notifications</a></div>
+</div>
 <h3>Live Execution Visualizer — PRJ-2026-0791</h3>
-<div id="status-banner" style="background:#fcebeb;color:#a32d2d;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px;font-weight:600">✗ Rejected</div>
+<div id="status-banner" style="background:#e6f1fb;color:#1a5a92;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px;font-weight:600">⏳ In analysis</div>
 <div id="topbar">
   <button id="replay-btn" onclick="startReplay()">▶ Replay</button>
   <span id="status">Ready.</span>
-  
+  <button type="button" id="skip-gate2-btn" style="margin-left:auto;background:none;border:none;font-size:13px;color:#378ADD;font-weight:600;cursor:pointer;padding:0">Show Gate 2 decision now →</button>
 </div>
 <div id="main-wrap">
   <div id="graph-wrap" style="width:700px;height:868px;">
@@ -93,7 +93,7 @@ line.edge.lit.done,path.edge.lit.done{stroke:#639922}
 <line id="edge_agent1_intake_parser__end_incomplete" x1="120.0" y1="138.0" x2="120.0" y2="191.0" class="edge" marker-end="url(#arrow)"/>
 <line id="edge_agent2_duplicate_checker__agent3_duplicate_rejection_notifier" x1="340.0" y1="138.0" x2="340.0" y2="182.0" class="edge" marker-end="url(#arrow)"/>
 <line id="edge_agent3_duplicate_rejection_notifier__end_dup" x1="340.0" y1="238.0" x2="340.0" y2="277.0" class="edge" marker-end="url(#arrow)"/>
-<line id="edge_agent6_knowledge_crosscheck__end_review" x1="120.0" y1="388.0" x2="120.0" y2="241.0" class="edge" marker-end="url(#arrow)"/>
+<line id="edge_agent6_knowledge_crosscheck__end_review" x1="120.0" y1="332.0" x2="120.0" y2="279.0" class="edge" marker-end="url(#arrow)"/>
 <line id="edge_gate2__agent8_rejection_feedback_composer" x1="120.0" y1="575.0" x2="120.0" y2="607.0" class="edge" marker-end="url(#arrow)"/>
 <line id="edge_agent8_rejection_feedback_composer__end_rejected" x1="120.0" y1="663.0" x2="120.0" y2="702.0" class="edge" marker-end="url(#arrow)"/>
     </svg>
@@ -127,13 +127,13 @@ line.edge.lit.done,path.edge.lit.done{stroke:#639922}
   </div>
 </div>
 <script>
-const sequence = [{"id": "agent1_intake_parser", "label": "Agent 1 \u00b7 Intake parser", "duration_ms": 0, "kind": "agent"}, {"id": "agent2_duplicate_checker", "label": "Agent 2 \u00b7 Duplicate checker", "duration_ms": 0, "kind": "agent"}, {"id": "gate1", "label": "Gate 1 \u00b7 Proceed", "duration_ms": 0, "kind": "gate"}, {"id": "agent4_pmo_router", "label": "Agent 4 \u00b7 PMO router / acknowledgment", "duration_ms": 0, "kind": "agent"}, {"id": "agent5_business_impact", "label": "Agent 5 \u00b7 Business impact", "duration_ms": 0, "kind": "agent"}, {"id": "agent6_knowledge_crosscheck", "label": "Agent 6 \u00b7 Knowledge cross-check", "duration_ms": 0, "kind": "agent"}, {"id": "gate2", "label": "Gate 2 \u00b7 PMO Decision", "duration_ms": 0, "kind": "gate"}, {"id": "agent8_rejection_feedback_composer", "label": "Agent 8 \u00b7 Rejection feedback", "duration_ms": 0, "kind": "agent"}, {"id": "end_rejected", "label": "\u2717 Rejected", "duration_ms": 0, "kind": "end"}];
-const steps = [{"agent": "Agent 1 \u00b7 Intake parser", "duration_ms": 0}, {"agent": "Agent 1 \u00b7 Intake parser", "duration_ms": 0}, {"agent": "Agent 2 \u00b7 Duplicate checker", "duration_ms": 0}, {"agent": "Agent 4 \u00b7 PMO router / acknowledgment", "duration_ms": 0}, {"agent": "Agent 5 \u00b7 Business impact", "duration_ms": 0}, {"agent": "Agent 6 \u00b7 Knowledge cross-check", "duration_ms": 0}, {"agent": "Agent 8 \u00b7 Rejection feedback", "duration_ms": 0}];
-const notifFeed = [{"trigger_agent": "agent1_intake_parser", "trigger_label": "Agent 1 \u00b7 Intake parser", "recipient": "Grace Lim", "channel": "email", "subject": "Submission received \u2014 \"Customer support AI triage\" is under review", "body": "Thank you for submitting \"Customer support AI triage\" to the Enterprise Project Management Office (PMO).\n\nYour submission has been received and is now under review. We will follow up with next steps as soon as the review is complete.\n\nBest regards,\nEnterprise PMO team"}, {"trigger_agent": "agent4_pmo_router", "trigger_label": "Agent 4 \u00b7 PMO router / acknowledgment", "recipient": "PMO Team", "channel": "email", "subject": "New submission for review \u2014 Customer support AI triage", "body": "A new project submission has been received and requires PMO awareness.\n\nProject: \"Customer support AI triage\" (PRJ-2026-0791)\nSubmitted by: Grace Lim\n\nAgent 5 (Business Impact) and Agent 6 (Knowledge Cross-Check) are now analyzing it. It will reach Manual Gate 2 for a PMO accept/reject decision once that analysis completes.\n\n\u2014 Automated PMO intake system"}, {"trigger_agent": "agent8_rejection_feedback_composer", "trigger_label": "Agent 8 \u00b7 Rejection feedback", "recipient": "Grace Lim", "channel": "email", "subject": "Update on your proposal: Customer support AI triage", "body": "Your proposal \"Customer support AI triage\" was not accepted at this time.\n\nReason: PMO rejected at Gate 2\n\nSuggested next step: Contact PMO for specific improvement guidance.\n\nBest regards,\nEnterprise PMO team"}];
+const sequence = [{"id": "agent1_intake_parser", "label": "Agent 1 \u00b7 Intake parser", "duration_ms": 0, "kind": "agent"}, {"id": "agent2_duplicate_checker", "label": "Agent 2 \u00b7 Duplicate checker", "duration_ms": 0, "kind": "agent"}, {"id": "gate1", "label": "Gate 1 \u00b7 Proceed", "duration_ms": 0, "kind": "gate"}, {"id": "agent4_pmo_router", "label": "Agent 4 \u00b7 PMO router / acknowledgment", "duration_ms": 0, "kind": "agent"}, {"id": "agent5_business_impact", "label": "Agent 5 \u00b7 Business impact", "duration_ms": 0, "kind": "agent"}, {"id": "agent6_knowledge_crosscheck", "label": "Agent 6 \u00b7 Knowledge cross-check", "duration_ms": 0, "kind": "agent"}, {"id": "gate2", "label": "Gate 2 \u00b7 PMO Decision", "duration_ms": 0, "kind": "gate"}];
+const steps = [{"agent": "Agent 1 \u00b7 Intake parser", "duration_ms": 0}, {"agent": "Agent 1 \u00b7 Intake parser", "duration_ms": 0}, {"agent": "Agent 2 \u00b7 Duplicate checker", "duration_ms": 0}, {"agent": "Agent 4 \u00b7 PMO router / acknowledgment", "duration_ms": 0}, {"agent": "Agent 5 \u00b7 Business impact", "duration_ms": 0}, {"agent": "Agent 6 \u00b7 Knowledge cross-check", "duration_ms": 0}];
+const notifFeed = [{"trigger_agent": "agent1_intake_parser", "trigger_label": "Agent 1 \u00b7 Intake parser", "recipient": "Grace Lim", "channel": "email", "subject": "Submission received \u2014 \"Customer support AI triage\" is under review", "body": "Thank you for submitting \"Customer support AI triage\" to the Enterprise Project Management Office (PMO).\n\nYour submission has been received and is now under review. We will follow up with next steps as soon as the review is complete.\n\nBest regards,\nEnterprise PMO team"}, {"trigger_agent": "agent4_pmo_router", "trigger_label": "Agent 4 \u00b7 PMO router / acknowledgment", "recipient": "PMO Team", "channel": "email", "subject": "New submission for review \u2014 Customer support AI triage", "body": "A new project submission has been received and requires PMO awareness.\n\nProject: \"Customer support AI triage\" (PRJ-2026-0791)\nSubmitted by: Grace Lim\n\nAgent 5 (Business Impact) and Agent 6 (Knowledge Cross-Check) are now analyzing it. It will reach Manual Gate 2 for a PMO accept/reject decision once that analysis completes.\n\n\u2014 Automated PMO intake system"}];
 const pace = 5000;
-const redirectTo = null;
-const resumeFrom = "gate2";
-const resumeStepCount = 6;
+const redirectTo = "gate2_SUB-0001.html";
+const resumeFrom = null;
+const resumeStepCount = 0;
 const resumeIndex = resumeFrom ? sequence.findIndex(n => n.id === resumeFrom) : -1;
 
 function tellParent(msg) {

@@ -35,6 +35,7 @@ from dashboard.render_visualizer import render as render_visualizer
 from dashboard.render_notifications import render as render_notifications
 from dashboard.render_gate2 import render as render_gate2
 from dashboard.render_gate3 import render as render_gate3
+from dashboard.render_change_result import render as render_change_result
 from dashboard.render_opl import render as render_opl_page
 from dashboard.render_gate2_queue import render as render_gate2_queue
 
@@ -460,7 +461,12 @@ def submit_project_update(project_ref, kind):
     result = process_update(conn, entry, row["project_name"], requested_by=payload["submitted_by"])
 
     if result["applied"]:
-        redirect = _redirect_with_notification("/dashboard/gate2_queue.html", result.get("notification"))
+        # Generate a proper change-result page (Agent 11 diff + Agent 12 verdict) instead of
+        # redirecting to gate2_queue.html, which shows nothing about what actually happened.
+        render_change_result(row, entry, result)
+        safe_id = (row.get("project_id") or row.get("submission_id", "unknown")).replace("/", "_")
+        base_path = f"/dashboard/change_result_{safe_id}.html"
+        redirect = _redirect_with_notification(base_path, result.get("notification"))
         return {"applied": True, "evaluation": result["evaluation"], "reason": result["reason"],
                 "redirect": redirect}
 
@@ -516,7 +522,10 @@ def submit_project_update_freeform(project_ref, from_field, subject, body):
     result = process_update(conn, entry, row["project_name"], requested_by=submitted_by)
 
     if result["applied"]:
-        redirect = _redirect_with_notification("/dashboard/gate2_queue.html", result.get("notification"))
+        render_change_result(row, entry, result)
+        safe_id = (row.get("project_id") or row.get("submission_id", "unknown")).replace("/", "_")
+        base_path = f"/dashboard/change_result_{safe_id}.html"
+        redirect = _redirect_with_notification(base_path, result.get("notification"))
         return {"applied": True, "evaluation": result["evaluation"], "reason": result["reason"],
                 "redirect": redirect}
 

@@ -1,18 +1,5 @@
-"""
-Manual Gate 3 decision page (§7.2.2, §8.2 guardrail 3) — the real stop for a post-acceptance change
-Agent 12 evaluated as 'needs_authorization' (regression on timeline/cost/risk, or no governance
-axis actually improved). Agent 12 only ever proposes on this path; nothing applies to the live
-`projects` row until a PMO presses Accept or Reject here.
-
-Rendered as a standalone page filling the WHOLE middle panel (unlike Gate 2, which is squeezed into
-the right panel so it never interrupts the flow-graph view, §9.3.4) — there's no flow graph running
-underneath a Gate 3 decision, so no need for that cross-frame dance. Buttons submit via fetch() and
-self-navigate on success, same JSON contract as Gate 2's /gate2/ route.
-"""
-import sys, os, html as html_lib
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-CSS = """
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Gate 3 — PMO Authorization Needed</title>
+<style>
 :root {
   --blue:      #2563eb; --blue-dark:#1d4ed8; --blue-light:#eff6ff; --blue-mid:#bfdbfe;
   --surface:   #ffffff; --surface-2:#f8fafc; --surface-3:#f1f5f9;
@@ -70,54 +57,28 @@ button:disabled { opacity: .55; cursor: not-allowed; }
                            transition: border-color .15s, box-shadow .15s; }
 .comment-panel textarea:focus { outline: none; border-color: var(--blue);
                                   box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
-"""
-
-_FIELD_LABELS = {
-    "expected_launch_date": "Expected launch",
-    "capex_usd": "CAPEX",
-    "risk_indicator": "Risk indicator",
-    "schedule_status": "Schedule status",
-    "resource_indicator": "Resource indicator",
-}
-
-
-def _fmt(field, val):
-    if val is None:
-        return "—"
-    if field == "capex_usd":
-        return f"${val:,.0f}"
-    return str(val)
-
-
-def render(change_request_id, project, update_entry, change_request):
-    before_state = update_entry["before_state"]
-    after_state = update_entry["after_state"]
-
-    rows = "".join(
-        f"""<tr><td class="field">{_FIELD_LABELS.get(f, f)}</td>
-        <td class="before">{html_lib.escape(_fmt(f, before_state.get(f)))}</td>
-        <td>→</td>
-        <td class="after">{html_lib.escape(_fmt(f, after_state.get(f)))}</td></tr>"""
-        for f in update_entry["fields_changed"]
-    )
-
-    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Gate 3 — PMO Authorization Needed</title>
-<style>{CSS}</style></head><body>
+</style></head><body>
 <div class="banner"><b>Manual Gate 3 — a project update needs PMO authorization.</b> Agent 12 (§7.2.2)
 evaluated this change against the project's current timeline/cost/risk and found it isn't a clean
 improvement across the board. It's been captured, not applied — nothing changes on the live project
 until you decide here.</div>
 <div class="summary">
-<b>{html_lib.escape(project['project_name'] or '')}</b> ({html_lib.escape(project['project_id'] or project['submission_id'])})<br>
-Requested by: {html_lib.escape(update_entry.get('submitted_by') or 'Unknown')}<br>
-Note: {html_lib.escape(update_entry.get('note') or '—')}
+<b>Customer support AI triage</b> (PRJ-2026-0791)<br>
+Requested by: Grace Lim<br>
+Note: Integration scope grew after vendor discovery; flagging a new dependency risk and revised CAPEX.
 </div>
 <div class="diff">
 <table><tr><th>Field</th><th>Before</th><th></th><th>After</th></tr>
-{rows}
+<tr><td class="field">CAPEX</td>
+        <td class="before">$55,000</td>
+        <td>→</td>
+        <td class="after">$85,000</td></tr><tr><td class="field">Risk indicator</td>
+        <td class="before">green</td>
+        <td>→</td>
+        <td class="after">yellow</td></tr>
 </table>
 </div>
-<div class="reason"><b>Why this needs authorization:</b> {html_lib.escape(change_request.get('reason') or '')}</div>
+<div class="reason"><b>Why this needs authorization:</b> regressed on: cost, risk</div>
 <div class="decision">
   <button type="button" class="accept" id="accept-btn">✓ Authorize this change</button>
   <button type="button" class="reject" id="reject-btn">✗ Decline</button>
@@ -130,41 +91,34 @@ Note: {html_lib.escape(update_entry.get('note') or '—')}
 <div id="gate3-status" style="font-size:12px;color:#888;margin-top:10px"></div>
 <script>
 var allButtons = ['accept-btn', 'reject-btn', 'cancel-btn'];
-function submitDecision(decision) {{
+function submitDecision(decision) {
   const statusEl = document.getElementById('gate3-status');
-  allButtons.forEach(function(id) {{ document.getElementById(id).disabled = true; }});
+  allButtons.forEach(function(id) { document.getElementById(id).disabled = true; });
   statusEl.innerText = decision === 'cancel' ? 'Cancelling the project…' : 'Submitting…';
   const body = new URLSearchParams();
   body.set('pmo_comment', document.getElementById('comment-field').value);
-  fetch('/gate3/{change_request_id}/' + decision, {{
+  fetch('/gate3/1/' + decision, {
     method: 'POST',
-    headers: {{'Content-Type': 'application/x-www-form-urlencoded'}},
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
     body: body.toString(),
-  }})
-    .then(r => r.json().then(data => ({{ok: r.ok, data: data}})))
-    .then(({{ok, data}}) => {{
-      if (!ok || !data.redirect) {{ throw new Error(data.error || 'unexpected server response'); }}
+  })
+    .then(r => r.json().then(data => ({ok: r.ok, data: data})))
+    .then(({ok, data}) => {
+      if (!ok || !data.redirect) { throw new Error(data.error || 'unexpected server response'); }
       statusEl.innerText = 'Decision recorded — updating the dashboard…';
       window.location.href = data.redirect;
-    }})
-    .catch(err => {{
+    })
+    .catch(err => {
       statusEl.innerText = 'Something went wrong — ' + err;
-      allButtons.forEach(function(id) {{ document.getElementById(id).disabled = false; }});
-    }});
-}}
-document.getElementById('accept-btn').addEventListener('click', function() {{ submitDecision('accept'); }});
-document.getElementById('reject-btn').addEventListener('click', function() {{ submitDecision('reject'); }});
-document.getElementById('cancel-btn').addEventListener('click', function() {{
-  if (confirm('Cancel this project entirely? This stops it — a bigger step than declining just this update.')) {{
+      allButtons.forEach(function(id) { document.getElementById(id).disabled = false; });
+    });
+}
+document.getElementById('accept-btn').addEventListener('click', function() { submitDecision('accept'); });
+document.getElementById('reject-btn').addEventListener('click', function() { submitDecision('reject'); });
+document.getElementById('cancel-btn').addEventListener('click', function() {
+  if (confirm('Cancel this project entirely? This stops it — a bigger step than declining just this update.')) {
     submitDecision('cancel');
-  }}
-}});
+  }
+});
 </script>
-</body></html>"""
-    out_path = os.path.abspath(os.path.join(os.path.dirname(__file__), f"gate3_{change_request_id}.html"))
-    with open(out_path, "w") as f:
-        f.write(html)
-    return out_path
-
-if __name__ == "__main__":
-    print("This page is meant to be generated mid-flow by scripts/demo_server.py, not run standalone.")
+</body></html>
