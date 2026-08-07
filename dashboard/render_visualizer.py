@@ -193,14 +193,28 @@ def render(project_id, replay_pace_ms=5000, redirect_to=None, resume_from=None):
     it continues on to Agent 7-10 (or Agent 8) at the normal pace, which is the only part that's new.
     """
     conn = get_connection()
-    rows = conn.execute("SELECT * FROM audit_log WHERE project_id = ? ORDER BY id", (project_id,)).fetchall()
-    raw_agents = [r["agent"] for r in rows]
-    durations = {r["agent"]: r["duration_ms"] for r in rows}
 
     proj_row = conn.execute(
         "SELECT * FROM projects WHERE project_id = ? OR submission_id = ?", (project_id, project_id)
     ).fetchone()
     proj = dict(proj_row) if proj_row else {}
+
+    # Phase-1 agents (1-6) are logged under the submission_id; phase-2 agents (7-10) are logged
+    # under the newly-issued project_id. Collect both sets and sort by id so the sequence is right.
+    sub_id = proj.get("submission_id") or project_id
+    proj_id_db = proj.get("project_id") or project_id
+    ids_to_fetch = list({project_id, sub_id, proj_id_db} - {None, ""})
+    if len(ids_to_fetch) == 1:
+        rows = conn.execute("SELECT * FROM audit_log WHERE project_id = ? ORDER BY id", (ids_to_fetch[0],)).fetchall()
+    else:
+        placeholders = ",".join("?" * len(ids_to_fetch))
+        rows = conn.execute(
+            f"SELECT * FROM audit_log WHERE project_id IN ({placeholders}) ORDER BY id", ids_to_fetch
+        ).fetchall()
+
+    raw_agents = [r["agent"] for r in rows]
+    durations = {r["agent"]: r["duration_ms"] for r in rows}
+
     status = proj.get("status", "")
     bg, fg, label = STATUS_BANNER.get(status, ("#f5f4f0", "#5f5e5a", status.title() or "Unknown"))
     reason_line = f' — {proj["rejection_reason"]}' if status == "rejected" and proj.get("rejection_reason") else ""
@@ -209,7 +223,13 @@ def render(project_id, replay_pace_ms=5000, redirect_to=None, resume_from=None):
         f'margin-bottom:16px;font-size:14px;font-weight:600">{label}{reason_line}</div>'
     )
 
-    notif_rows = conn.execute("SELECT * FROM notifications WHERE project_id = ? ORDER BY id", (project_id,)).fetchall()
+    # Same multi-id approach for notifications
+    if len(ids_to_fetch) == 1:
+        notif_rows = conn.execute("SELECT * FROM notifications WHERE project_id = ? ORDER BY id", (ids_to_fetch[0],)).fetchall()
+    else:
+        notif_rows = conn.execute(
+            f"SELECT * FROM notifications WHERE project_id IN ({placeholders}) ORDER BY id", ids_to_fetch
+        ).fetchall()
 
     notif_feed = [
         {
@@ -253,6 +273,7 @@ def render(project_id, replay_pace_ms=5000, redirect_to=None, resume_from=None):
 
         if dx < 20:
             # Vertical connection (same column — U-turn or exit branch)
+<<<<<<< HEAD
             if by > ay:
                 # going downward: start at source bottom, end at target top
                 x1, y1 = ax, ay + ah / 2
@@ -261,6 +282,16 @@ def render(project_id, replay_pace_ms=5000, redirect_to=None, resume_from=None):
                 # going upward (e.g. end_review above Agent 6): start at source top, end at target bottom
                 x1, y1 = ax, ay - ah / 2
                 x2, y2 = bx, by + bh / 2
+=======
+            # Detect upward edges (target above source) and flip endpoints so
+            # marker-end lands at the correct tip.
+            if by < ay:
+                x1, y1 = ax, ay - ah / 2   # source top
+                x2, y2 = bx, by + bh / 2   # target bottom
+            else:
+                x1, y1 = ax, ay + ah / 2   # source bottom
+                x2, y2 = bx, by - bh / 2   # target top
+>>>>>>> Test-1
             edge_svg.append(
                 f'<line id="{eid}" x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
                 f'class="edge" marker-end="url(#arrow)"/>'

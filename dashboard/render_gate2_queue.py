@@ -13,35 +13,69 @@ from src.db.repositories import get_gate2_queue, get_regional_committed_capex, g
 from src.shared.config import REGIONAL_CAPEX_BUDGET_USD, BUDGET_HEADROOM_LENS_THRESHOLD, GATE2_FAST_TRACK_CAPEX_USD
 
 CSS = """
-body{font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:900px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}
-.nav{font-size:12px;margin-bottom:16px}
-.nav a{color:#378ADD;text-decoration:none;margin-right:14px}
-.banner{background:#e6f1fb;border:1px solid #378ADD;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px}
-.banner b{color:#1a5a92}
-.batch-status{display:flex;justify-content:space-between;align-items:center;background:#f5f4f0;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px}
+:root {
+  --blue:      #2563eb; --blue-dark:#1d4ed8; --blue-light:#eff6ff; --blue-mid:#bfdbfe;
+  --surface:   #ffffff; --surface-2:#f8fafc; --surface-3:#f1f5f9;
+  --border:    #e2e8f0; --border-2: #cbd5e1;
+  --text:      #0f172a; --text-2:   #475569; --text-3:   #94a3b8;
+  --green-bg:  #f0fdf4; --green-bd: #86efac; --green-tx: #15803d;
+  --yellow-bg: #fffbeb; --yellow-bd:#fcd34d; --yellow-tx:#92400e;
+  --red-bg:    #fef2f2; --red-bd:   #fca5a5; --red-tx:   #b91c1c;
+  --gray-bg:   #f8fafc; --gray-bd:  #cbd5e1; --gray-tx:  #475569;
+  --orange:    #f59e0b; --orange-dark:#d97706;
+  --radius:8px; --radius-lg:12px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.05);
+}
+*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+     max-width:960px;margin:2rem auto;padding:0 1.5rem;color:var(--text);font-size:13px;
+     background:var(--surface-2)}
+.nav{font-size:12px;margin-bottom:18px;display:flex;align-items:center;gap:6px}
+.nav a{color:var(--blue);text-decoration:none;font-weight:500}
+.nav a:hover{text-decoration:underline}
+.banner{background:var(--blue-light);border:1px solid var(--blue-mid);border-radius:var(--radius);
+        padding:12px 16px;margin-bottom:16px;font-size:13px;line-height:1.5}
+.banner b{color:#1e40af}
+.batch-status{display:flex;justify-content:space-between;align-items:center;
+              background:var(--surface-3);border:1px solid var(--border);
+              border-radius:var(--radius);padding:11px 16px;margin-bottom:20px;
+              font-size:13px;gap:10px;flex-wrap:wrap}
 .batch-status form{margin:0}
-button{background:#378ADD;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer}
-button:hover{background:#2c6fb3}
+button{background:var(--blue);color:#fff;border:none;border-radius:6px;padding:7px 15px;
+       font-size:12px;cursor:pointer;font-weight:500;letter-spacing:.01em;
+       transition:background .15s,box-shadow .15s}
+button:hover{background:var(--blue-dark);box-shadow:0 2px 6px rgba(37,99,235,.28)}
+button:disabled{opacity:.55;cursor:not-allowed}
 .rollups{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:24px}
-.rollup{border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.6}
-.rollup.ok{background:#eaf3de;border:1px solid #a8d18d}
-.rollup.over{background:#fdf2f2;border:1px solid #f0c9c9}
-.rollup .region{font-weight:600;font-size:13px;margin-bottom:4px}
-.rollup.ok .region{color:#3b6d11}
-.rollup.over .region{color:#a32d2d}
+.rollup{border-radius:var(--radius);padding:12px 14px;font-size:12px;line-height:1.6;
+        box-shadow:var(--shadow-sm)}
+.rollup.ok  {background:var(--green-bg); border:1px solid var(--green-bd)}
+.rollup.over{background:var(--red-bg);   border:1px solid var(--red-bd)}
+.rollup .region{font-weight:700;font-size:13px;margin-bottom:4px}
+.rollup.ok   .region{color:var(--green-tx)}
+.rollup.over .region{color:var(--red-tx)}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;color:#5f5e5a;font-weight:400;font-size:11px;padding:8px 6px;border-bottom:1px solid #ddd}
-td{padding:8px 6px;border-bottom:1px solid #eee;vertical-align:top}
-.badge{font-size:11px;padding:2px 8px;border-radius:6px}
-.green{background:#eaf3de;color:#3b6d11}.yellow{background:#faeeda;color:#854f0b}.red{background:#fcebeb;color:#a32d2d}.gray{background:#f1efe8;color:#5f5e5a}
-.override-form{display:flex;gap:4px;margin-top:6px}
-.override-form input{font-size:11px;border:1px solid #ddd;border-radius:4px;padding:3px 6px;width:140px}
-.override-form button{padding:3px 8px;font-size:11px;background:#ef9f27}
-.override-form button:hover{background:#d98a1a}
-.empty{color:#888;font-size:13px;padding:20px;text-align:center}
-.queue-details summary{font-size:14px;font-weight:600;margin-bottom:8px;cursor:pointer;color:#1a1a1a;list-style-position:outside}
-.queue-details summary:hover{color:#378ADD}
+th{text-align:left;color:var(--text-3);font-weight:600;font-size:11px;padding:8px 7px;
+   border-bottom:2px solid var(--border);text-transform:uppercase;letter-spacing:.04em}
+td{padding:8px 7px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:hover td{background:var(--surface-3)}
+.badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500}
+.green {background:var(--green-bg); color:var(--green-tx); border:1px solid var(--green-bd)}
+.yellow{background:var(--yellow-bg);color:var(--yellow-tx);border:1px solid var(--yellow-bd)}
+.red   {background:var(--red-bg);   color:var(--red-tx);   border:1px solid var(--red-bd)}
+.gray  {background:var(--gray-bg);  color:var(--gray-tx);  border:1px solid var(--gray-bd)}
+.override-form{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+.override-form input{font-size:11px;border:1px solid var(--border);border-radius:5px;
+                      padding:4px 7px;width:148px;color:var(--text)}
+.override-form input:focus{outline:none;border-color:var(--blue)}
+.override-form button{padding:4px 10px;font-size:11px;background:var(--orange);box-shadow:none}
+.override-form button:hover{background:var(--orange-dark);box-shadow:none}
+.empty{color:var(--text-3);font-size:13px;padding:24px;text-align:center;font-style:italic}
+.queue-details summary{font-size:14px;font-weight:600;margin-bottom:8px;cursor:pointer;
+                        color:var(--text);list-style-position:outside}
+.queue-details summary:hover{color:var(--blue)}
 .queue-details table{margin-top:10px}
+h3{font-size:13px;font-weight:700;color:var(--text);margin:0 0 12px}
 """
 
 
@@ -138,12 +172,12 @@ def render_queue_fragment(conn):
     batch_status_html = (
         f"""<div class="batch-status">
   <span>Batch <b>#{open_batch['id']}</b> open since {open_batch['opened_at']} (opened by {html_lib.escape(open_batch['opened_by'] or 'PMO')})</span>
-  <form method="POST" action="/queue/close-batch/{open_batch['id']}" target="_top"><button type="submit">Close this batch</button></form>
+  <button type="button" data-batch-action="/queue/close-batch/{open_batch['id']}">Close this batch</button>
 </div>"""
         if open_batch else
         """<div class="batch-status">
   <span>No batch currently open.</span>
-  <form method="POST" action="/queue/open-batch" target="_top"><button type="submit">Open this week's batch</button></form>
+  <button type="button" data-batch-action="/queue/open-batch">Open this week's batch</button>
 </div>"""
     )
 
@@ -189,7 +223,7 @@ def render():
     fragment, queue_len = render_queue_fragment(conn)
     html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Gate 2 — Batch Queue</title>
 <style>{CSS}</style></head><body>
-<div class="nav"><a href="/" target="_top">← Composer</a></div>
+<div class="nav"><span style="color:var(--text-3)">&#8592;</span> <a href="/" target="_top">Composer</a></div>
 {fragment}
 <script>
 // Case 8/9 (§7.2 change management) and a plain project-update never run through the Live Execution

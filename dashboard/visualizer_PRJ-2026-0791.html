@@ -1,0 +1,224 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Live Execution Visualizer — PRJ-2026-0791</title>
+<style>
+body{font-family:-apple-system,Helvetica,Arial,sans-serif;margin:1.5rem 2rem;color:#2a2a28;background:#fafaf8}
+h3{margin-bottom:4px}
+.nav{font-size:12px;margin-bottom:10px}
+.nav a{color:#378ADD;text-decoration:none;margin-right:14px}
+.nav a:hover{text-decoration:underline}
+#topbar{display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+#replay-btn{background:#378ADD;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:14px;cursor:pointer;font-weight:600}
+#replay-btn:hover{background:#2c6fb3}
+#status{font-size:13px;color:#555;font-family:monospace}
+/* ── Snake diagram wrapper ── */
+#main-wrap{display:flex;gap:28px;align-items:flex-start}
+#graph-wrap{position:relative;flex-shrink:0}
+svg#edges{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+line.edge,path.edge{stroke:#ccc;stroke-width:2;transition:stroke .25s,stroke-width .25s;fill:none}
+line.edge.lit,path.edge.lit{stroke:#378ADD;stroke-width:3}
+line.edge.lit.done,path.edge.lit.done{stroke:#639922}
+/* ── Node cards ── */
+.node{position:absolute;display:flex;align-items:center;justify-content:center;text-align:center;
+  font-size:11px;line-height:1.35;border-radius:10px;
+  background:#fff;border:2px solid #e0ddd5;
+  color:#aaa;transition:background .3s,border-color .3s,color .3s,box-shadow .3s;
+  box-sizing:border-box;padding:6px 8px;
+  box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.node .step-num{display:block;font-size:9px;font-weight:700;letter-spacing:.05em;
+  color:#bbb;margin-bottom:2px;text-transform:uppercase}
+.node.diamond{border-radius:0;transform:rotate(45deg);background:#fff5e0;border-color:#e8c96a}
+.node.diamond span{transform:rotate(-45deg);font-weight:700;font-size:11px}
+.node.chip{border-radius:20px;font-size:10px;font-style:italic;background:#f0f0ec;border-color:#ddd}
+.node.active{background:#e6f1fb;border-color:#378ADD;color:#1a1a1a;
+  box-shadow:0 0 0 4px rgba(55,138,221,.18),0 2px 8px rgba(55,138,221,.12)}
+.node.diamond.active{background:#e6f1fb;border-color:#378ADD}
+.node.complete{background:#eaf3de;border-color:#639922;color:#2a2a28;
+  box-shadow:0 1px 4px rgba(99,153,34,.10)}
+.node.diamond.complete{background:#eaf3de;border-color:#639922}
+/* ── Execution log panel ── */
+#log{flex:1;min-width:240px;max-width:300px;font-size:13px}
+#log h4{margin:0 0 10px;font-size:13px;color:#444}
+#log-list{list-style:none;margin:0;padding:0;border-left:2px solid #e5e3dc}
+#log-list li{padding:5px 0 5px 14px;color:#bbb;font-family:monospace;font-size:11px;
+  border-left:2px solid transparent;margin-left:-2px;transition:color .2s}
+#log-list li.active{color:#378ADD;border-left-color:#378ADD}
+#log-list li.complete{color:#444;border-left-color:#639922}
+#summary{margin-top:14px;font-size:12px;color:#777;line-height:1.5}
+.legend{margin-top:12px;font-size:11px;color:#999;display:flex;gap:16px;flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+/* ── Row direction labels ── */
+.row-label{position:absolute;font-size:9px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:#aaa;pointer-events:none}
+</style></head><body>
+<div class="nav"><a href="/" target="_top">← Composer</a>
+</div>
+<h3>Live Execution Visualizer — PRJ-2026-0791</h3>
+<div id="status-banner" style="background:#e6f1fb;color:#1a5a92;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px;font-weight:600">⏳ In analysis</div>
+<div id="topbar">
+  <button id="replay-btn" onclick="startReplay()">▶ Replay</button>
+  <span id="status">Ready.</span>
+  <button type="button" id="skip-gate2-btn" style="margin-left:auto;background:none;border:none;font-size:13px;color:#378ADD;font-weight:600;cursor:pointer;padding:0">Show Gate 2 decision now →</button>
+</div>
+<div id="main-wrap">
+  <div id="graph-wrap" style="width:700px;height:868px;">
+    <svg id="edges" viewBox="0 0 700 868">
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#bbb"/>
+        </marker>
+        <marker id="arrow-lit" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#378ADD"/>
+        </marker>
+        <marker id="arrow-done" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#639922"/>
+        </marker>
+      </defs>
+      <rect x="32" y="74" width="616" height="72" rx="34" fill="#378ADD" opacity="0.10"/>
+<rect x="32" y="324" width="616" height="72" rx="34" fill="#378ADD" opacity="0.10"/>
+<rect x="32" y="499" width="616" height="72" rx="34" fill="#378ADD" opacity="0.10"/>
+<rect x="32" y="744" width="616" height="72" rx="34" fill="#378ADD" opacity="0.10"/>
+<rect x="472" y="142" width="176" height="186" fill="#378ADD" opacity="0.10"/>
+<rect x="32" y="392" width="176" height="111" fill="#378ADD" opacity="0.10"/>
+<rect x="472" y="567" width="176" height="181" fill="#378ADD" opacity="0.10"/>
+      <line id="edge_agent1_intake_parser__agent2_duplicate_checker" x1="200.0" y1="110.0" x2="260.0" y2="110.0" class="edge" marker-end="url(#arrow)"/>
+<line id="edge_agent2_duplicate_checker__gate1" x1="420.0" y1="110.0" x2="520.0" y2="110.0" class="edge" marker-end="url(#arrow)"/>
+<line id="edge_gate1__agent4_pmo_router" x1="560.0" y1="150.0" x2="560.0" y2="332.0" class="edge" marker-end="url(#arrow)"/>
+<line id="edge_agent4_pmo_router__agent5_business_impact" x1="480.0" y1="360.0" x2="420.0" y2="360.0" class="edge" marker-end="url(#arrow)"/>
+<line id="edge_agent5_business_impact__agent6_knowledge_crosscheck" x1="260.0" y1="360.0" x2="200.0" y2="360.0" class="edge" marker-end="url(#arrow)"/>
+<line id="edge_agent6_knowledge_crosscheck__gate2" x1="120.0" y1="388.0" x2="120.0" y2="495.0" class="edge" marker-end="url(#arrow)"/>
+<line id="edge_gate2__agent7_acceptance_handler" x1="160.0" y1="535.0" x2="260.0" y2="535.0" class="edge" marker-end="url(#arrow)"/>
+<line id="edge_agent7_acceptance_handler__agent9_dashboard_service" x1="420.0" y1="535.0" x2="480.0" y2="535.0" class="edge" marker-end="url(#arrow)"/>
+<line id="edge_agent9_dashboard_service__agent10_success_predictor" x1="560.0" y1="563.0" x2="560.0" y2="752.0" class="edge" marker-end="url(#arrow)"/>
+<line id="edge_agent10_success_predictor__end_accepted" x1="480.0" y1="780.0" x2="420.0" y2="780.0" class="edge" marker-end="url(#arrow)"/>
+<line id="edge_agent1_intake_parser__end_incomplete" x1="120.0" y1="138.0" x2="120.0" y2="191.0" class="edge" marker-end="url(#arrow)"/>
+<line id="edge_agent2_duplicate_checker__agent3_duplicate_rejection_notifier" x1="340.0" y1="138.0" x2="340.0" y2="182.0" class="edge" marker-end="url(#arrow)"/>
+<line id="edge_agent3_duplicate_rejection_notifier__end_dup" x1="340.0" y1="238.0" x2="340.0" y2="277.0" class="edge" marker-end="url(#arrow)"/>
+<line id="edge_agent6_knowledge_crosscheck__end_review" x1="120.0" y1="332.0" x2="120.0" y2="279.0" class="edge" marker-end="url(#arrow)"/>
+<line id="edge_gate2__agent8_rejection_feedback_composer" x1="120.0" y1="575.0" x2="120.0" y2="607.0" class="edge" marker-end="url(#arrow)"/>
+<line id="edge_agent8_rejection_feedback_composer__end_rejected" x1="120.0" y1="663.0" x2="120.0" y2="702.0" class="edge" marker-end="url(#arrow)"/>
+    </svg>
+    <div class="node box" id="node-agent1_intake_parser" style="left:40.0px;top:82.0px;width:160px;height:56px;"><span>Agent 1<br>Intake Parser</span></div>
+<div class="node box" id="node-agent2_duplicate_checker" style="left:260.0px;top:82.0px;width:160px;height:56px;"><span>Agent 2<br>Duplicate Checker</span></div>
+<div class="node diamond" id="node-gate1" style="left:520.0px;top:70.0px;width:80px;height:80px;"><span>Gate 1<br>Proceed</span></div>
+<div class="node box" id="node-agent4_pmo_router" style="left:480.0px;top:332.0px;width:160px;height:56px;"><span>Agent 4<br>PMO Router / Ack</span></div>
+<div class="node box" id="node-agent5_business_impact" style="left:260.0px;top:332.0px;width:160px;height:56px;"><span>Agent 5<br>Business Impact</span></div>
+<div class="node box" id="node-agent6_knowledge_crosscheck" style="left:40.0px;top:332.0px;width:160px;height:56px;"><span>Agent 6<br>Knowledge Cross-Check</span></div>
+<div class="node diamond" id="node-gate2" style="left:80.0px;top:495.0px;width:80px;height:80px;"><span>Gate 2<br>PMO Decision</span></div>
+<div class="node box" id="node-agent7_acceptance_handler" style="left:260.0px;top:507.0px;width:160px;height:56px;"><span>Agent 7<br>Acceptance Handler</span></div>
+<div class="node box" id="node-agent9_dashboard_service" style="left:480.0px;top:507.0px;width:160px;height:56px;"><span>Agent 9<br>Dashboard Publish</span></div>
+<div class="node box" id="node-agent10_success_predictor" style="left:480.0px;top:752.0px;width:160px;height:56px;"><span>Agent 10<br>Success Predictor</span></div>
+<div class="node chip" id="node-end_accepted" style="left:260.0px;top:761.0px;width:160px;height:38px;"><span>✓ Accepted</span></div>
+<div class="node chip" id="node-end_incomplete" style="left:40.0px;top:191.0px;width:160px;height:38px;"><span>Rejected<br>Incomplete info</span></div>
+<div class="node box" id="node-agent3_duplicate_rejection_notifier" style="left:260.0px;top:182.0px;width:160px;height:56px;"><span>Agent 3<br>Duplicate Reject Notify</span></div>
+<div class="node chip" id="node-end_dup" style="left:260.0px;top:277.0px;width:160px;height:38px;"><span>Rejected<br>Duplicate</span></div>
+<div class="node chip" id="node-end_review" style="left:40.0px;top:241.0px;width:160px;height:38px;"><span>Under Review<br>Inconclusive</span></div>
+<div class="node box" id="node-agent8_rejection_feedback_composer" style="left:40.0px;top:607.0px;width:160px;height:56px;"><span>Agent 8<br>Rejection Feedback</span></div>
+<div class="node chip" id="node-end_rejected" style="left:40.0px;top:702.0px;width:160px;height:38px;"><span>✗ Rejected</span></div>
+  </div>
+  <div id="log">
+    <h4>Execution log</h4>
+    <ul id="log-list"></ul>
+    <div class="legend">
+      <span><i class="sw" style="background:#378ADD"></i>running</span>
+      <span><i class="sw" style="background:#639922"></i>done</span>
+      <span><i class="sw" style="background:#e5e3dc"></i>not on path</span>
+    </div>
+    <div id="summary"></div>
+  </div>
+</div>
+<script>
+const sequence = [{"id": "agent1_intake_parser", "label": "Agent 1 \u00b7 Intake parser", "duration_ms": 0, "kind": "agent"}, {"id": "agent2_duplicate_checker", "label": "Agent 2 \u00b7 Duplicate checker", "duration_ms": 0, "kind": "agent"}, {"id": "gate1", "label": "Gate 1 \u00b7 Proceed", "duration_ms": 0, "kind": "gate"}, {"id": "agent4_pmo_router", "label": "Agent 4 \u00b7 PMO router / acknowledgment", "duration_ms": 0, "kind": "agent"}, {"id": "agent5_business_impact", "label": "Agent 5 \u00b7 Business impact", "duration_ms": 0, "kind": "agent"}, {"id": "agent6_knowledge_crosscheck", "label": "Agent 6 \u00b7 Knowledge cross-check", "duration_ms": 0, "kind": "agent"}, {"id": "gate2", "label": "Gate 2 \u00b7 PMO Decision", "duration_ms": 0, "kind": "gate"}];
+const steps = [{"agent": "Agent 1 \u00b7 Intake parser", "duration_ms": 0}, {"agent": "Agent 1 \u00b7 Intake parser", "duration_ms": 0}, {"agent": "Agent 2 \u00b7 Duplicate checker", "duration_ms": 0}, {"agent": "Agent 4 \u00b7 PMO router / acknowledgment", "duration_ms": 0}, {"agent": "Agent 5 \u00b7 Business impact", "duration_ms": 0}, {"agent": "Agent 6 \u00b7 Knowledge cross-check", "duration_ms": 0}];
+const notifFeed = [{"trigger_agent": "agent1_intake_parser", "trigger_label": "Agent 1 \u00b7 Intake parser", "recipient": "Grace Lim", "channel": "email", "subject": "Submission received \u2014 \"Customer support AI triage\" is under review", "body": "Thank you for submitting \"Customer support AI triage\" to the Enterprise Project Management Office (PMO).\n\nYour submission has been received and is now under review. We will follow up with next steps as soon as the review is complete.\n\nBest regards,\nEnterprise PMO team"}, {"trigger_agent": "agent4_pmo_router", "trigger_label": "Agent 4 \u00b7 PMO router / acknowledgment", "recipient": "PMO Team", "channel": "email", "subject": "New submission for review \u2014 Customer support AI triage", "body": "A new project submission has been received and requires PMO awareness.\n\nProject: \"Customer support AI triage\" (PRJ-2026-0791)\nSubmitted by: Grace Lim\n\nAgent 5 (Business Impact) and Agent 6 (Knowledge Cross-Check) are now analyzing it. It will reach Manual Gate 2 for a PMO accept/reject decision once that analysis completes.\n\n\u2014 Automated PMO intake system"}];
+const pace = 5000;
+const redirectTo = "gate2_SUB-0001.html";
+const resumeFrom = null;
+const resumeStepCount = 0;
+const resumeIndex = resumeFrom ? sequence.findIndex(n => n.id === resumeFrom) : -1;
+
+function tellParent(msg) {
+  try { window.parent.postMessage(msg, '*'); } catch (e) {}
+}
+
+function showGate2Decision() {
+  if (redirectTo) tellParent({type: 'gate2_pending', gate2_url: '/dashboard/' + redirectTo});
+}
+const skipBtn = document.getElementById('skip-gate2-btn');
+if (skipBtn) skipBtn.addEventListener('click', showGate2Decision);
+
+const logList = document.getElementById('log-list');
+steps.forEach((s, i) => {
+  const li = document.createElement('li');
+  li.id = 'log-' + i;
+  li.textContent = s.agent;
+  logList.appendChild(li);
+});
+
+function resetGraph() {
+  document.querySelectorAll('.node').forEach(n => n.classList.remove('active','complete'));
+  document.querySelectorAll('.edge').forEach(e => e.classList.remove('lit','done'));
+  document.querySelectorAll('#log-list li').forEach(li => li.classList.remove('active','complete'));
+  document.getElementById('summary').innerText = '';
+}
+
+function playGraph(i) {
+  if (i > 0) {
+    const prevId = sequence[i-1].id;
+    const prevEl = document.getElementById('node-' + prevId);
+    if (prevEl) { prevEl.classList.remove('active'); prevEl.classList.add('complete'); }
+    if (i < sequence.length) {
+      const edgeEl = document.getElementById('edge_' + prevId + '__' + sequence[i].id);
+      if (edgeEl) { edgeEl.classList.remove('lit'); edgeEl.classList.add('lit','done'); }
+    }
+    notifFeed.filter(n => n.trigger_agent === prevId).forEach(n => tellParent({type: 'notification', notif: n}));
+  }
+  if (i >= sequence.length) {
+    if (redirectTo) {
+      document.getElementById('status').innerText = 'Done. Awaiting a Gate 2 decision — see the right panel →';
+      setTimeout(() => showGate2Decision(), 800);
+    } else {
+      document.getElementById('status').innerText = 'Done.';
+    }
+    return;
+  }
+  const node = sequence[i];
+  const el = document.getElementById('node-' + node.id);
+  if (el) { el.classList.add('active'); }
+  if (i > 0) {
+    const edgeEl = document.getElementById('edge_' + sequence[i-1].id + '__' + node.id);
+    if (edgeEl) edgeEl.classList.add('lit');
+  }
+  document.getElementById('status').innerText = 'Running: ' + node.label.replace('\n', ' ');
+  const delay = (i <= resumeIndex) ? 0 : pace;
+  setTimeout(() => playGraph(i+1), delay);
+}
+
+function playStep(i) {
+  if (i > 0) {
+    const prev = document.getElementById('log-' + (i-1));
+    if (prev) { prev.classList.remove('active'); prev.classList.add('complete'); }
+  }
+  if (i >= steps.length) {
+    document.getElementById('summary').innerText =
+      'Automated steps total: ' + steps.reduce((a,s)=>a+s.duration_ms,0) + 'ms (mock-mode timings — real API calls will reflect actual model latency per SLA targets).';
+    return;
+  }
+  const li = document.getElementById('log-' + i);
+  if (li) {
+    li.classList.add('active');
+    li.textContent = steps[i].agent + ' — ' + steps[i].duration_ms + 'ms';
+  }
+  const delay = (i < resumeStepCount) ? 0 : pace;
+  setTimeout(() => playStep(i+1), delay);
+}
+
+function startReplay() {
+  resetGraph();
+  tellParent({type: 'reset'});
+  document.getElementById('status').innerText = 'Running…';
+  playGraph(0);
+  playStep(0);
+}
+startReplay();
+</script>
+</body></html>

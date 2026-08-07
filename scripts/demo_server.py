@@ -98,123 +98,237 @@ def _save_state():
 PENDING, RESOLVED = _load_state()
 
 PAGE_CSS = """
+:root {
+  --blue:       #2563eb;
+  --blue-dark:  #1d4ed8;
+  --blue-light: #eff6ff;
+  --blue-mid:   #bfdbfe;
+  --surface:    #ffffff;
+  --surface-2:  #f8fafc;
+  --surface-3:  #f1f5f9;
+  --border:     #e2e8f0;
+  --border-2:   #cbd5e1;
+  --text:       #0f172a;
+  --text-2:     #475569;
+  --text-3:     #94a3b8;
+  --green-bg:   #f0fdf4; --green-bd:   #86efac; --green-tx:   #15803d;
+  --yellow-bg:  #fffbeb; --yellow-bd:  #fcd34d; --yellow-tx:  #92400e;
+  --red-bg:     #fef2f2; --red-bd:     #fca5a5; --red-tx:     #b91c1c;
+  --gray-bg:    #f8fafc; --gray-bd:    #cbd5e1; --gray-tx:    #475569;
+  --orange:     #f59e0b; --orange-dark:#d97706;
+  --radius:     8px;
+  --radius-lg:  12px;
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+  --shadow:     0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -2px rgba(0,0,0,.05);
+}
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
-body{font-family:-apple-system,Helvetica,Arial,sans-serif;color:#1a1a1a;display:flex;flex-direction:column;height:100vh}
-#topbar{flex-shrink:0;background:#fafaf8;display:flex;flex-direction:column;max-height:50vh}
-#topbar h3{font-size:13px;margin:0;padding:12px 14px;border-bottom:1px solid #e5e3dc;background:#fff;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-#revert-btn{background:#f1efe8;color:#5f5e5a;border:1px solid #ddd;border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer}
-#revert-btn:hover{background:#e5e3dc;color:#1a1a1a}
-#app{flex:1;display:flex;min-height:0}
-#left{width:360px;flex-shrink:0;overflow-y:auto;padding:1.25rem;background:#fafaf8}
-#left h2{font-size:16px;margin:0 0 4px}
-#left .sub{color:#5f5e5a;font-size:12px;margin-bottom:18px;line-height:1.5}
-#middle{flex:1;display:flex;flex-direction:column;min-width:0}
-#middle iframe{flex:1;border:none;width:100%}
-.resizer{width:6px;flex-shrink:0;cursor:col-resize;background:#e5e3dc;position:relative;transition:background .15s}
-.resizer:hover,.resizer.active{background:#378ADD}
-.resizer::after{content:'';position:absolute;top:0;bottom:0;left:-3px;right:-3px}
-#decision-area:empty{display:none}
-#decision-area{flex-shrink:0;max-height:40vh;overflow-y:auto;border-bottom:3px solid #378ADD;background:#fff}
-#decision-area iframe{width:100%;height:400px;border:none;display:block}
-#notif-feed{display:flex;gap:10px;overflow-x:auto;padding:12px;flex-shrink:0}
-#notif-feed .empty{color:#999;font-size:12px;padding:8px 4px}
-.notifcard{border:1px solid #e5e3dc;border-radius:8px;overflow:hidden;background:#fff;animation:pop .25s ease-out;flex:0 0 280px;max-height:160px;display:flex;flex-direction:column}
-@keyframes pop {{ from {{ opacity:0; transform:translateY(-4px); }} to {{ opacity:1; transform:translateY(0); }} }}
-.notifcard .nhead{font-size:10px;color:#378ADD;font-weight:600;background:#e6f1fb;padding:5px 10px}
-.notifcard .nsubject{font-size:12px;font-weight:600;padding:8px 10px 0}
-.notifcard .nbody{font-size:11px;color:#444;padding:4px 10px 10px;white-space:pre-wrap;line-height:1.5;flex:1;overflow-y:auto}
-.notifcard .nto{font-size:10px;color:#888;padding:0 10px 6px}
-.case{border:1px solid #e5e3dc;border-radius:10px;margin-bottom:12px;overflow:hidden;background:#fff}
-.case .head{background:#f5f4f0;padding:10px 12px}
-.case .head .title{font-weight:600;font-size:13px;display:block}
-.case .head .outcome{font-size:11px;color:#5f5e5a;font-style:italic}
-.mail{padding:10px 12px;font-size:12px;line-height:1.5;max-height:140px;overflow-y:auto}
-.mail .line{margin-bottom:2px;color:#5f5e5a}
-.mail .body{white-space:pre-wrap;margin-top:6px;color:#1a1a1a}
-.runbar{padding:8px 12px;border-top:1px solid #eee;text-align:right}
-button{background:#378ADD;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer}
-button:hover{background:#2c6fb3}
-#action-select{width:100%;padding:8px 10px;font-size:13px;border:1px solid #e5e3dc;border-radius:6px;margin-bottom:12px;background:#fff}
-.action-panel{display:none}
-.action-panel.active{display:block}
-.divider{display:flex;align-items:center;gap:10px;margin:20px 0 14px}
-.divider .line{flex:1;height:1px;background:#e5e3dc}
-.divider span{font-size:11px;color:#999}
-#compose,#update-compose{border:1px solid #e5e3dc;border-radius:10px;padding:10px 12px;background:#fff}
-#compose label,#update-compose label{font-size:11px;color:#5f5e5a;display:block;margin-bottom:3px}
-#compose input,#compose textarea,#compose select,#update-compose input,#update-compose textarea,#update-compose select{width:100%;font-size:12px;font-family:inherit;padding:6px 8px;border:1px solid #e5e3dc;border-radius:6px;margin-bottom:10px;box-sizing:border-box}
-#compose textarea{height:120px;resize:vertical}
-#update-compose .empty{color:#888;font-size:12px;padding:6px 2px}
-/* Ghost-text body editor (shared by both compose boxes): the label before each colon is real, fixed
-   text (contenteditable="false") — always there, can't be typed over or deleted — while the hint
-   after it is greyed-out ghost text that clears the instant you click into the row, so you can type
-   the value straight in without re-typing or remembering the field name. */
-.body-editable{width:100%;font-size:12px;font-family:inherit;padding:8px;border:1px solid #e5e3dc;border-radius:6px;box-sizing:border-box;min-height:110px;line-height:1.8;cursor:text;margin-bottom:10px}
-.body-editable:focus{outline:2px solid #d8d4c8;outline-offset:1px}
-.uline{white-space:pre-wrap}
-.uline.note-row,.uline.spaced{margin-top:10px}
-.uline .lbl{color:#2a2a28}
-.uline .ghost{color:#a8a49a}
-.uline .filled{color:#2a2a28}
-/* Periodic Gate 2 Review queue (dashboard/render_gate2_queue.py's render_queue_fragment()),
-   embedded directly here instead of on the now-removed topline dashboard (§14). Scoped under
-   #queue-embed since the fragment's own class names (table/th/td/.badge/.empty/button) would
-   otherwise clash with — or get overridden by — this page's existing generic rules. */
-#queue-embed{margin-top:8px}
-#queue-embed table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px}
-#queue-embed th{text-align:left;color:#5f5e5a;font-weight:400;font-size:11px;padding:6px 4px;border-bottom:1px solid #ddd}
-#queue-embed td{padding:6px 4px;border-bottom:1px solid #eee;vertical-align:top}
-#queue-embed .badge{font-size:11px;padding:2px 8px;border-radius:6px}
-#queue-embed .green{background:#eaf3de;color:#3b6d11}
-#queue-embed .yellow{background:#faeeda;color:#854f0b}
-#queue-embed .red{background:#fcebeb;color:#a32d2d}
-#queue-embed .gray{background:#f1efe8;color:#5f5e5a}
-#queue-embed .banner{background:#e6f1fb;border:1px solid #378ADD;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px}
-#queue-embed .banner b{color:#1a5a92}
-#queue-embed .batch-status{display:flex;justify-content:space-between;align-items:center;background:#f5f4f0;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;flex-wrap:wrap;gap:8px}
-#queue-embed .batch-status form{margin:0}
-#queue-embed .rollups{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:16px}
-#queue-embed .rollup{border-radius:8px;padding:10px 12px;font-size:11px;line-height:1.5}
-#queue-embed .rollup.ok{background:#eaf3de;border:1px solid #a8d18d}
-#queue-embed .rollup.over{background:#fdf2f2;border:1px solid #f0c9c9}
-#queue-embed .rollup .region{font-weight:600;font-size:12px;margin-bottom:4px}
-#queue-embed .rollup.ok .region{color:#3b6d11}
-#queue-embed .rollup.over .region{color:#a32d2d}
-#queue-embed .override-form{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
-#queue-embed .override-form input{font-size:11px;border:1px solid #ddd;border-radius:4px;padding:3px 6px;width:100px}
-#queue-embed .override-form button{padding:3px 8px;font-size:11px;background:#ef9f27}
-#queue-embed .override-form button:hover{background:#d98a1a}
-#queue-embed .empty{color:#888;font-size:12px;padding:14px;text-align:center}
-#queue-embed h3{font-size:12px;margin:10px 0 6px}
-/* Queued-projects table collapses behind a native <details> (dashboard/render_gate2_queue.py) —
-   one row per queued project is the tallest, most repetitive part of this narrow left-panel embed,
-   so it starts closed rather than always pushing everything below it down the page. */
-#queue-embed .queue-details summary{font-size:12px;font-weight:600;margin:10px 0 6px;cursor:pointer;color:#1a1a1a;list-style-position:outside}
-#queue-embed .queue-details summary:hover{color:#378ADD}
-#queue-embed .queue-details table{margin-top:8px}
-/* Active projects — live risk/schedule/resource view (dashboard/render_active_projects.py's
-   render_active_fragment()), §14 follow-up. Same scoping approach and visual language as
-   #queue-embed above, under its own #active-embed prefix so neither fragment's badge/table/details
-   rules bleed into the other. This is the confirmation view for "did my update actually apply" —
-   the topline dashboard used to be the only place that showed live risk/schedule/resource state;
-   nothing replaced it when that dashboard was removed until now. */
-#active-embed{margin-top:8px}
-#active-embed table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px}
-#active-embed th{text-align:left;color:#5f5e5a;font-weight:400;font-size:11px;padding:6px 4px;border-bottom:1px solid #ddd}
-#active-embed td{padding:6px 4px;border-bottom:1px solid #eee;vertical-align:top}
-#active-embed .badge{font-size:11px;padding:2px 8px;border-radius:6px}
-#active-embed .green{background:#eaf3de;color:#3b6d11}
-#active-embed .yellow{background:#faeeda;color:#854f0b}
-#active-embed .red{background:#fcebeb;color:#a32d2d}
-#active-embed .gray{background:#f1efe8;color:#5f5e5a}
-#active-embed .banner{background:#e6f1fb;border:1px solid #378ADD;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px}
-#active-embed .banner b{color:#1a5a92}
-#active-embed .empty{color:#888;font-size:12px;padding:14px;text-align:center}
-#active-embed h3{font-size:12px;margin:10px 0 6px}
-#active-embed .active-details summary{font-size:12px;font-weight:600;margin:10px 0 6px;cursor:pointer;color:#1a1a1a;list-style-position:outside}
-#active-embed .active-details summary:hover{color:#378ADD}
-#active-embed .active-details table{margin-top:8px}
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       color: var(--text); display: flex; flex-direction: column; height: 100vh;
+       background: var(--surface-3); font-size: 13px; }
+
+/* ── Top bar ── */
+#topbar { flex-shrink:0; background:var(--surface); display:flex; flex-direction:column;
+          max-height:50vh; border-bottom:1px solid var(--border); box-shadow:var(--shadow-sm); }
+#topbar-title { font-size:12px; font-weight:600; margin:0; padding:9px 16px;
+                border-bottom:1px solid var(--border); background:var(--surface);
+                display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+                color:var(--text-2); letter-spacing:.02em; text-transform:uppercase; }
+#topbar-title .brand { display:flex; align-items:center; gap:8px; }
+#topbar-title .brand-dot { width:8px; height:8px; background:var(--blue);
+                            border-radius:50%; flex-shrink:0; }
+#revert-btn { background:var(--surface-3); color:var(--text-2); border:1px solid var(--border-2);
+              border-radius:6px; padding:5px 10px; font-size:11px; cursor:pointer;
+              transition:all .15s; font-weight:500; }
+#revert-btn:hover { background:var(--surface-2); color:var(--text); border-color:var(--text-3); }
+
+/* ── App shell ── */
+#app { flex:1; display:flex; min-height:0; }
+
+/* ── Left panel ── */
+#left { width:360px; flex-shrink:0; overflow-y:auto; padding:0;
+        background:var(--surface-2); border-right:1px solid var(--border); }
+#left-inner { padding:16px; }
+#left-header { padding:16px 16px 12px; border-bottom:1px solid var(--border);
+               background:var(--surface); margin-bottom:0; }
+#left-header h2 { font-size:15px; font-weight:700; margin:0 0 3px; color:var(--text); }
+#left-header .sub { color:var(--text-2); font-size:11.5px; line-height:1.55; margin:0; }
+
+/* ── Middle panel ── */
+#middle { flex:1; display:flex; flex-direction:column; min-width:0; background:var(--surface); }
+#middle iframe { flex:1; border:none; width:100%; }
+.resizer { width:5px; flex-shrink:0; cursor:col-resize; background:var(--border);
+           position:relative; transition:background .15s; }
+.resizer:hover, .resizer.active { background:var(--blue); }
+.resizer::after { content:''; position:absolute; top:0; bottom:0; left:-3px; right:-3px; }
+
+/* ── Decision overlay ── */
+#decision-area:empty { display:none; }
+#decision-area { flex-shrink:0; max-height:40vh; overflow-y:auto;
+                 border-bottom:3px solid var(--blue); background:var(--surface); }
+#decision-area iframe { width:100%; height:400px; border:none; display:block; }
+
+/* ── Notification feed ── */
+#notif-feed { display:flex; gap:8px; overflow-x:auto; padding:10px 14px; flex-shrink:0; }
+#notif-feed .empty { color:var(--text-3); font-size:12px; padding:6px 2px; font-style:italic; }
+.notifcard { border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden;
+             background:var(--surface); animation:pop .2s ease-out; flex:0 0 268px;
+             max-height:154px; display:flex; flex-direction:column; box-shadow:var(--shadow-sm); }
+@keyframes pop { from { opacity:0; transform:translateY(-5px) scale(.98); }
+                  to   { opacity:1; transform:translateY(0)   scale(1);   } }
+.notifcard .nhead { font-size:10px; color:var(--blue); font-weight:600;
+                    background:var(--blue-light); padding:5px 10px; letter-spacing:.02em; }
+.notifcard .nsubject { font-size:12px; font-weight:600; padding:8px 10px 2px; }
+.notifcard .nbody { font-size:11px; color:var(--text-2); padding:2px 10px 8px;
+                    white-space:pre-wrap; line-height:1.5; flex:1; overflow-y:auto; }
+.notifcard .nto { font-size:10px; color:var(--text-3); padding:0 10px 6px; }
+
+/* ── Case cards ── */
+.case { border:1px solid var(--border); border-radius:var(--radius-lg); margin-bottom:10px;
+        overflow:hidden; background:var(--surface); box-shadow:var(--shadow-sm);
+        transition:box-shadow .15s; }
+.case:hover { box-shadow:var(--shadow); }
+.case .head { background:var(--surface-3); padding:10px 13px;
+              border-bottom:1px solid var(--border); }
+.case .head .title { font-weight:600; font-size:13px; display:block; color:var(--text); }
+.case .head .outcome { font-size:11px; color:var(--text-2); margin-top:2px; display:block; }
+.mail { padding:10px 13px; font-size:12px; line-height:1.5; max-height:136px; overflow-y:auto; }
+.mail .line { margin-bottom:2px; color:var(--text-2); }
+.mail .line b { color:var(--text); }
+.mail .body { white-space:pre-wrap; margin-top:6px; color:var(--text); }
+.runbar { padding:9px 13px; border-top:1px solid var(--border); text-align:right;
+          background:var(--surface); }
+
+/* ── Buttons ── */
+button { background:var(--blue); color:#fff; border:none; border-radius:6px;
+         padding:7px 14px; font-size:12px; cursor:pointer; font-weight:500;
+         transition:background .15s, box-shadow .15s; letter-spacing:.01em; }
+button:hover { background:var(--blue-dark); box-shadow:0 2px 6px rgba(37,99,235,.3); }
+button:disabled { opacity:.55; cursor:not-allowed; }
+
+/* ── Select ── */
+#action-select { width:100%; padding:8px 10px; font-size:13px; border:1px solid var(--border);
+                 border-radius:var(--radius); margin-bottom:10px; background:var(--surface);
+                 color:var(--text); box-shadow:var(--shadow-sm);
+                 transition:border-color .15s, box-shadow .15s; }
+#action-select:focus { outline:none; border-color:var(--blue);
+                       box-shadow:0 0 0 3px rgba(37,99,235,.15); }
+.action-panel { display:none; }
+.action-panel.active { display:block; }
+
+/* ── Dividers ── */
+.divider { display:flex; align-items:center; gap:10px; margin:18px 0 12px; }
+.divider .line { flex:1; height:1px; background:var(--border); }
+.divider span { font-size:10.5px; color:var(--text-3); font-weight:600; text-transform:uppercase;
+                letter-spacing:.06em; white-space:nowrap; }
+
+/* ── Compose boxes ── */
+#compose, #update-compose { border:1px solid var(--border); border-radius:var(--radius-lg);
+                             padding:12px 14px; background:var(--surface);
+                             box-shadow:var(--shadow-sm); }
+#compose label, #update-compose label { font-size:11px; color:var(--text-2); display:block;
+                                         margin-bottom:3px; font-weight:500; }
+#compose input, #compose textarea, #compose select,
+#update-compose input, #update-compose textarea, #update-compose select {
+  width:100%; font-size:12px; font-family:inherit; padding:7px 9px;
+  border:1px solid var(--border); border-radius:6px; margin-bottom:10px;
+  box-sizing:border-box; color:var(--text); transition:border-color .15s, box-shadow .15s; }
+#compose input:focus, #compose textarea:focus, #compose select:focus,
+#update-compose input:focus, #update-compose textarea:focus, #update-compose select:focus {
+  outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+#compose textarea { height:110px; resize:vertical; }
+#update-compose .empty { color:var(--text-3); font-size:12px; padding:6px 2px; }
+
+/* ── Ghost-text editor ── */
+.body-editable { width:100%; font-size:12px; font-family:inherit; padding:9px 10px;
+                 border:1px solid var(--border); border-radius:6px; box-sizing:border-box;
+                 min-height:110px; line-height:1.85; cursor:text; margin-bottom:10px;
+                 transition:border-color .15s, box-shadow .15s; background:var(--surface); }
+.body-editable:focus { outline:none; border-color:var(--blue);
+                        box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+.uline { white-space:pre-wrap; }
+.uline.note-row, .uline.spaced { margin-top:10px; }
+.uline .lbl  { color:var(--text); font-weight:500; }
+.uline .ghost  { color:var(--text-3); }
+.uline .filled { color:var(--text); }
+
+/* ── Left sub-text ── */
+.sub { color:var(--text-2); font-size:11.5px; line-height:1.55; }
+
+/* ══════════════════════════════════════════════
+   #queue-embed  — Periodic Gate 2 batch queue
+   ══════════════════════════════════════════════ */
+#queue-embed { margin-top:6px; }
+#queue-embed table { width:100%; border-collapse:collapse; font-size:11.5px; margin-bottom:4px; }
+#queue-embed th { text-align:left; color:var(--text-3); font-weight:600; font-size:10.5px;
+                  padding:5px 4px; border-bottom:2px solid var(--border);
+                  text-transform:uppercase; letter-spacing:.04em; }
+#queue-embed td { padding:6px 4px; border-bottom:1px solid var(--border); vertical-align:top; }
+#queue-embed .badge { font-size:10.5px; padding:2px 7px; border-radius:20px; font-weight:500; }
+#queue-embed .green  { background:var(--green-bg);  color:var(--green-tx);  border:1px solid var(--green-bd); }
+#queue-embed .yellow { background:var(--yellow-bg); color:var(--yellow-tx); border:1px solid var(--yellow-bd); }
+#queue-embed .red    { background:var(--red-bg);    color:var(--red-tx);    border:1px solid var(--red-bd); }
+#queue-embed .gray   { background:var(--gray-bg);   color:var(--gray-tx);   border:1px solid var(--gray-bd); }
+#queue-embed .banner { background:var(--blue-light); border:1px solid var(--blue-mid);
+                        border-radius:var(--radius); padding:10px 12px; margin-bottom:10px;
+                        font-size:11.5px; line-height:1.5; }
+#queue-embed .banner b { color:#1e40af; }
+#queue-embed .batch-status { display:flex; justify-content:space-between; align-items:center;
+                              background:var(--surface-3); border:1px solid var(--border);
+                              border-radius:var(--radius); padding:9px 11px; margin-bottom:12px;
+                              font-size:11.5px; flex-wrap:wrap; gap:8px; }
+#queue-embed .batch-status form { margin:0; }
+#queue-embed .rollups { display:grid; grid-template-columns:1fr; gap:7px; margin-bottom:14px; }
+#queue-embed .rollup { border-radius:var(--radius); padding:9px 11px; font-size:11px; line-height:1.5; }
+#queue-embed .rollup.ok   { background:var(--green-bg);  border:1px solid var(--green-bd); }
+#queue-embed .rollup.over { background:var(--red-bg);    border:1px solid var(--red-bd); }
+#queue-embed .rollup .region { font-weight:700; font-size:11.5px; margin-bottom:3px; }
+#queue-embed .rollup.ok   .region { color:var(--green-tx); }
+#queue-embed .rollup.over .region { color:var(--red-tx); }
+#queue-embed .override-form { display:flex; gap:4px; margin-top:6px; flex-wrap:wrap; }
+#queue-embed .override-form input { font-size:11px; border:1px solid var(--border);
+                                     border-radius:4px; padding:4px 7px; width:108px;
+                                     color:var(--text); }
+#queue-embed .override-form button { padding:4px 9px; font-size:11px;
+                                      background:var(--orange); box-shadow:none; }
+#queue-embed .override-form button:hover { background:var(--orange-dark); }
+#queue-embed .empty { color:var(--text-3); font-size:12px; padding:14px; text-align:center;
+                       font-style:italic; }
+#queue-embed h3 { font-size:11.5px; margin:10px 0 6px; color:var(--text);
+                   font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+#queue-embed .queue-details summary { font-size:12px; font-weight:600; margin:10px 0 6px;
+                                        cursor:pointer; color:var(--text);
+                                        list-style-position:outside; }
+#queue-embed .queue-details summary:hover { color:var(--blue); }
+#queue-embed .queue-details table { margin-top:8px; }
+
+/* ══════════════════════════════════════════════
+   #active-embed — Active projects live view
+   ══════════════════════════════════════════════ */
+#active-embed { margin-top:6px; }
+#active-embed table { width:100%; border-collapse:collapse; font-size:11.5px; margin-bottom:4px; }
+#active-embed th { text-align:left; color:var(--text-3); font-weight:600; font-size:10.5px;
+                    padding:5px 4px; border-bottom:2px solid var(--border);
+                    text-transform:uppercase; letter-spacing:.04em; }
+#active-embed td { padding:6px 4px; border-bottom:1px solid var(--border); vertical-align:top; }
+#active-embed .badge  { font-size:10.5px; padding:2px 7px; border-radius:20px; font-weight:500; }
+#active-embed .green  { background:var(--green-bg);  color:var(--green-tx);  border:1px solid var(--green-bd); }
+#active-embed .yellow { background:var(--yellow-bg); color:var(--yellow-tx); border:1px solid var(--yellow-bd); }
+#active-embed .red    { background:var(--red-bg);    color:var(--red-tx);    border:1px solid var(--red-bd); }
+#active-embed .gray   { background:var(--gray-bg);   color:var(--gray-tx);   border:1px solid var(--gray-bd); }
+#active-embed .banner { background:var(--blue-light); border:1px solid var(--blue-mid);
+                          border-radius:var(--radius); padding:10px 12px; margin-bottom:10px;
+                          font-size:11.5px; }
+#active-embed .banner b { color:#1e40af; }
+#active-embed .empty { color:var(--text-3); font-size:12px; padding:14px; text-align:center;
+                         font-style:italic; }
+#active-embed h3 { font-size:11.5px; margin:10px 0 6px; color:var(--text);
+                    font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+#active-embed .active-details summary { font-size:12px; font-weight:600; margin:10px 0 6px;
+                                           cursor:pointer; color:var(--text);
+                                           list-style-position:outside; }
+#active-embed .active-details summary:hover { color:var(--blue); }
+#active-embed .active-details table { margin-top:8px; }
 """
 
 # Ghost-text body editor (shared by "or submit your own" and "or send a project update"): parses a
@@ -414,30 +528,37 @@ real Manual Gate 3 for PMO to accept, decline, or cancel the project.</div>
 <div class="divider"><div class="line"></div><span>this week's Gate 2 batch{f' ({queue_len} pending)' if queue_len else ''}</span><div class="line"></div></div>
 <div id="queue-embed">{queue_fragment}</div>"""
 
-    return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>PMO Intake — Composer</title>
+    return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>PMO Agent — Intake Composer</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <style>{PAGE_CSS}</style></head><body>
 <div id="topbar">
-  <h3>📧 Notifications
+  <div id="topbar-title">
+    <div class="brand">
+      <div class="brand-dot"></div>
+      <span>PMO Agent &mdash; Notifications</span>
+    </div>
     <form method="POST" action="/reset" target="_top" style="margin:0" onsubmit="return confirm('Revert the demo? This wipes and reseeds the database and clears everything run so far.');">
-      <button type="submit" id="revert-btn">↺ Revert back</button>
+      <button type="submit" id="revert-btn">&#8635; Revert back</button>
     </form>
-  </h3>
+  </div>
   <div id="decision-area"></div>
-  <div id="notif-feed"><div class="empty">Nothing sent yet — run a case and this fills in as the flow reaches each notification step.</div></div>
+  <div id="notif-feed"><div class="empty">Nothing sent yet &mdash; run a case and notifications appear here in real time.</div></div>
 </div>
 <div id="app">
   <div id="left">
-    <h2>PMO Project Intake — composer</h2>
-    <div class="sub">Choose a case, or compose your own below, then run it through the real agent
-    pipeline. Middle panel shows the flow — Gate 2 review if a PMO decision is needed, then the live
-    execution graph. The notifications strip above fills in with each notification the instant its
-    step fires during replay.</div>
+    <div id="left-header">
+      <h2>PMO Project Intake</h2>
+      <p class="sub">Choose a case, or compose your own below, then run it through the real agent
+      pipeline. The middle panel shows the live execution graph. Gate 2 decisions appear above.</p>
+    </div>
+    <div id="left-inner">
     <select id="action-select">{"".join(options)}</select>
     {"".join(panels)}
     {compose_section}
     {update_section}
     {active_section}
     {queue_section}
+    </div>
   </div>
   <div class="resizer" id="resize-left" title="Drag to resize"></div>
   <div id="middle">
@@ -479,9 +600,32 @@ window.addEventListener('message', function(e) {{
     // The right panel's tiny decision iframe never navigates itself — the middle panel (the real
     // flow graph) is what continues on to replay the rest of the pipeline once a decision is made.
     document.getElementById('middle-frame').src = e.data.redirect;
+    // After any Gate 2 decision (Accept / Reject / Hold), refresh the left-panel queue embed so
+    // the held/decided project immediately appears (or disappears) — without this the queue only
+    // updates on the next full page load, making a just-held project invisible to the PMO.
+    fetch('/queue/fragment')
+      .then(function(r) {{ return r.text(); }})
+      .then(function(html) {{ document.getElementById('queue-embed').innerHTML = html; }});
   }}
 }});
 document.getElementById('middle-frame').addEventListener('load', function() {{ clearFeed(); clearDecision(); }});
+
+// Intercept Open/Close batch buttons (data-batch-action) so they POST via fetch
+// and only refresh #queue-embed — never a full page reload that would blank middle-frame.
+document.getElementById('left').addEventListener('click', function(e) {{
+  var btn = e.target.closest('[data-batch-action]');
+  if (!btn) return;
+  e.preventDefault();
+  var url = btn.getAttribute('data-batch-action');
+  btn.disabled = true;
+  fetch(url, {{method: 'POST'}})
+    .then(function() {{ return fetch('/queue/fragment'); }})
+    .then(function(r) {{ return r.text(); }})
+    .then(function(html) {{
+      document.getElementById('queue-embed').innerHTML = html;
+    }})
+    .catch(function() {{ btn.disabled = false; }});
+}});
 
 // Ghost-text body editor (shared by both compose boxes below the case dropdown): each row's label
 // span is contenteditable="false" (real, fixed text, can't be typed over or deleted) and its value
@@ -659,6 +803,14 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/" or parsed.path == "":
             self._send_html(render_landing())
             return
+        if parsed.path == "/queue/fragment":
+            # AJAX endpoint — returns only the queue fragment HTML so the left panel can
+            # refresh #queue-embed in-place after Open/Close batch without a full page reload
+            # (which would blank the middle-frame).
+            frag, _ = render_queue_fragment(get_connection())
+            self._send_html(frag)
+            return
+
         if parsed.path.startswith("/dashboard/"):
             rel = urllib.parse.unquote(parsed.path[len("/dashboard/"):])
             full = os.path.normpath(os.path.join(DASHBOARD_DIR, rel))
