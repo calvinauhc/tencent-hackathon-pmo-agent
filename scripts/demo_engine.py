@@ -307,17 +307,21 @@ def run_scenario_to_gate2(scenario_key):
 
 
 def resume_scenario(project, trace, gate2_decision, scenario_key=None, override_reason=None, pmo_comment="",
-                     gate2_batch_id=None, exception_reason=None):
+                     gate2_batch_id=None, exception_reason=None, pmo_override_reason=None):
     """Phase 2 of the composer flow — takes the real PMO decision made on the Gate 2 page and
     completes the pipeline (Agent 7/9/10 on accept, Agent 8 on reject). Uses the same DB the
     scenario was seeded into during run_scenario_to_gate2() (not fresh — this continues that run,
     it doesn't start a new one). `override_reason`/`pmo_comment` come straight from the PMO's edits
-    on the Gate 2 reject form, if this is a rejection. `gate2_batch_id`/`exception_reason` (§5.3)
-    carry through from wherever this decision was actually invited — an open batch sitting, a
+    on the Gate 2 reject form, if this is a rejection. `pmo_override_reason` is required when
+    accepting a non-aligned verdict — resume_after_gate2() enforces this for real (not just the
+    Gate 2 page's own form validation) and raises Gate2OverrideRequiredError if it's missing, which
+    the caller (scripts/demo_server.py) surfaces as a real 400. `gate2_batch_id`/`exception_reason`
+    (§5.3) carry through from wherever this decision was actually invited — an open batch sitting, a
     logged PMO override, or neither (cases 1–7's immediate/demo-mode path)."""
     conn = get_connection()
     trace = resume_after_gate2(conn, project, trace, gate2_decision, override_reason=override_reason,
-                                pmo_comment=pmo_comment, gate2_batch_id=gate2_batch_id, exception_reason=exception_reason)
+                                pmo_comment=pmo_comment, gate2_batch_id=gate2_batch_id, exception_reason=exception_reason,
+                                pmo_override_reason=pmo_override_reason)
     result_id = _result_id(project, trace)
 
     if scenario_key == "6_change_request_stakeholder_flag" and trace["final_status"] not in ("rejected",):

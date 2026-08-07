@@ -5,6 +5,10 @@ pace via JS — a directed graph of the actual 1-10 pipeline (§2), with the rea
 took lighting up node-by-node and edge-by-edge, CrewAI-flow style, plus a scrolling execution log.
 Only the nodes/edges this specific run actually touched light up; the rest of the graph stays
 dimmed to show the paths that existed but weren't taken (duplicate-reject, misaligned-reject, etc).
+
+Layout: horizontal snake / S-curve (3 nodes per row, rows alternate L→R and R→L), inspired by
+step-by-step process flow diagrams — the main trunk flows like a ribbon, exit branches hang below
+each junction node.
 """
 import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -23,53 +27,98 @@ AGENT_LABELS = {
     "agent10_success_predictor": "Agent 10 · Success predictor",
 }
 
-# Static architecture of the pipeline (§2/§8) — every node and edge that CAN exist, regardless of
-# which path any one submission actually takes. (cx, cy, w, h, shape, two-line label)
+# ─── Snake-layout constants ───────────────────────────────────────────────────
+# The main pipeline trunk flows in a horizontal snake: 3 nodes per row,
+# rows alternate left-to-right then right-to-left, connected by a U-turn
+# at each row end (like the reference image).
 #
-# Two columns: LEFT is the main trunk (Agent 1 through Gate 2) continuing straight down into the
-# accept path (Agent 7 -> 9 -> 10 -> Accepted) — the happy path stays one straight vertical line,
-# no diagonal jump. RIGHT holds every alternate/exit branch off that trunk: incomplete-at-intake,
-# duplicate, inconclusive-under-review, and Gate 2's reject path (Agent 8 -> Rejected). This keeps
-# the whole graph visible in one screen's width instead of three columns sprawling sideways.
-COL_MAIN = 230
-COL_ALT = 510
+# Row 0 (L→R): Agent1 → Agent2 → Gate1
+# Row 1 (R→L): Agent6 → Agent5 → Agent4          (U-turn connector after Gate1)
+# Row 2 (L→R): Agent7 → Agent9 → Agent10
+# Row 3 (R→L): end_accepted  (last chip, right-aligned end)
+#
+# Exit branches hang BELOW the junction node (not sideways), keeping
+# the snake ribbon readable on screen.
+
+NODE_W   = 160   # box width
+NODE_H   = 56    # box height
+GATE_S   = 80    # diamond "radius" (square side before rotation)
+CHIP_H   = 38    # terminal chip height
+COL_GAP  = 60    # horizontal gap between node centres in a row
+BRANCH_DY = 100  # extra Y below a row centre for exit-branch chips/nodes
+
+# Per-row Y centres — non-uniform gaps so branches never overlap the next row
+# Row 0→1 gap = 250  (needs room for: end_dup = BRANCH_DY+NODE_H+30+CHIP_H/2 = 214 → safe)
+# Row 1→2 gap = 175  (end_review = BRANCH_DY+CHIP_H/2 = 119 below row1 → safe)
+# Row 2→3 gap = 200  (agent8+end_rejected = BRANCH_DY+NODE_H+30+CHIP_H/2 = 214 — same as row0)
+ROW_Y = [110, 360, 535, 780]
+
+# Node centre X values (3 columns)
+COL_X = [120, 120 + NODE_W + COL_GAP, 120 + 2*(NODE_W + COL_GAP)]  # ≈ 120, 340, 560
+
+def _cx(col): return COL_X[col]
+def _cy(row): return ROW_Y[row]
+
+# (cx, cy, w, h, shape, label)
 NODE_POS = {
-    "agent1_intake_parser":              (COL_MAIN,  35, 176, 52, "box",     "Agent 1\nIntake Parser"),
-    "agent2_duplicate_checker":          (COL_MAIN, 130, 176, 52, "box",     "Agent 2\nDuplicate Checker"),
-    "agent3_duplicate_rejection_notifier":(COL_ALT, 130, 176, 52, "box",    "Agent 3\nDuplicate Reject Notify"),
-    "end_incomplete":                    (COL_ALT,  35, 176, 40, "chip",    "Rejected\nIncomplete info"),
-    "gate1":                             (COL_MAIN, 220,  96, 84, "diamond", "Gate 1\nProceed"),
-    "agent4_pmo_router":                 (COL_MAIN, 315, 176, 52, "box",     "Agent 4\nPMO Router / Ack"),
-    "agent5_business_impact":            (COL_MAIN, 400, 176, 52, "box",     "Agent 5\nBusiness Impact"),
-    "agent6_knowledge_crosscheck":       (COL_MAIN, 485, 176, 52, "box",     "Agent 6\nKnowledge Cross-Check"),
-    "end_review":                        (COL_ALT, 485, 176, 40, "chip",    "Under Review\nInconclusive"),
-    "gate2":                             (COL_MAIN, 580,  96, 84, "diamond", "Gate 2\nPMO Decision"),
-    "agent7_acceptance_handler":         (COL_MAIN, 680, 176, 52, "box",     "Agent 7\nAcceptance Handler"),
-    "agent9_dashboard_service":          (COL_MAIN, 765, 176, 52, "box",     "Agent 9\nDashboard Publish"),
-    "agent10_success_predictor":         (COL_MAIN, 850, 176, 52, "box",     "Agent 10\nSuccess Predictor"),
-    "end_accepted":                      (COL_MAIN, 925, 176, 40, "chip",    "Accepted"),
-    "agent8_rejection_feedback_composer":(COL_ALT, 680, 176, 52, "box",     "Agent 8\nRejection Feedback"),
-    "end_rejected":                      (COL_ALT, 765, 176, 40, "chip",    "Rejected"),
+    # ── Row 0 L→R ──────────────────────────────────────────────────────────
+    "agent1_intake_parser":              (_cx(0), _cy(0), NODE_W, NODE_H, "box",     "Agent 1\nIntake Parser"),
+    "agent2_duplicate_checker":          (_cx(1), _cy(0), NODE_W, NODE_H, "box",     "Agent 2\nDuplicate Checker"),
+    "gate1":                             (_cx(2), _cy(0), GATE_S, GATE_S, "diamond", "Gate 1\nProceed"),
+
+    # ── Row 1 R→L: Gate1 → Agent4 → Agent5 → Agent6 → Gate2 ───────────────
+    "agent4_pmo_router":                 (_cx(2), _cy(1), NODE_W, NODE_H, "box",     "Agent 4\nPMO Router / Ack"),
+    "agent5_business_impact":            (_cx(1), _cy(1), NODE_W, NODE_H, "box",     "Agent 5\nBusiness Impact"),
+    "agent6_knowledge_crosscheck":       (_cx(0), _cy(1), NODE_W, NODE_H, "box",     "Agent 6\nKnowledge Cross-Check"),
+
+    # ── Row 2 L→R ──────────────────────────────────────────────────────────
+    "gate2":                             (_cx(0), _cy(2), GATE_S, GATE_S, "diamond", "Gate 2\nPMO Decision"),
+    "agent7_acceptance_handler":         (_cx(1), _cy(2), NODE_W, NODE_H, "box",     "Agent 7\nAcceptance Handler"),
+    "agent9_dashboard_service":          (_cx(2), _cy(2), NODE_W, NODE_H, "box",     "Agent 9\nDashboard Publish"),
+
+    # ── Row 3 R→L ──────────────────────────────────────────────────────────
+    "agent10_success_predictor":         (_cx(2), _cy(3), NODE_W, NODE_H, "box",     "Agent 10\nSuccess Predictor"),
+    "end_accepted":                      (_cx(1), _cy(3), NODE_W, CHIP_H, "chip",    "✓ Accepted"),
+
+    # ── Exit branches (hang below their junction) ───────────────────────────
+    # Below Agent 1 (row 0 col 0) — incomplete rejection chip
+    "end_incomplete":                    (_cx(0), _cy(0) + BRANCH_DY, NODE_W, CHIP_H, "chip", "Rejected\nIncomplete info"),
+    # Below Agent 2 (row 0 col 1) — duplicate path
+    "agent3_duplicate_rejection_notifier": (_cx(1), _cy(0) + BRANCH_DY, NODE_W, NODE_H, "box", "Agent 3\nDuplicate Reject Notify"),
+    "end_dup":                           (_cx(1), _cy(0) + BRANCH_DY + NODE_H + 30, NODE_W, CHIP_H, "chip", "Rejected\nDuplicate"),
+    # Above Agent 6 (row 1 col 0) — inconclusive/under review exit, sits above Agent 6
+    "end_review":                        (_cx(0), _cy(1) - BRANCH_DY, NODE_W, CHIP_H, "chip", "Under Review\nInconclusive"),
+    # Below Gate 2 (row 2 col 0) — rejection path
+    "agent8_rejection_feedback_composer": (_cx(0), _cy(2) + BRANCH_DY, NODE_W, NODE_H, "box", "Agent 8\nRejection Feedback"),
+    "end_rejected":                      (_cx(0), _cy(2) + BRANCH_DY + NODE_H + 30, NODE_W, CHIP_H, "chip", "✗ Rejected"),
 }
 
-NODE_POS["end_dup"] = (COL_ALT, 220, 176, 40, "chip", "Rejected\nDuplicate")
-
+# Main trunk edges (snake ribbon) + exit-branch edges
 EDGES = [
-    ("agent1_intake_parser", "agent2_duplicate_checker"),
-    ("agent1_intake_parser", "end_incomplete"),
-    ("agent2_duplicate_checker", "gate1"),
-    ("agent2_duplicate_checker", "agent3_duplicate_rejection_notifier"),
-    ("agent3_duplicate_rejection_notifier", "end_dup"),
-    ("gate1", "agent4_pmo_router"),
-    ("agent4_pmo_router", "agent5_business_impact"),
-    ("agent5_business_impact", "agent6_knowledge_crosscheck"),
+    # Row 0 trunk (L→R)
+    ("agent1_intake_parser",        "agent2_duplicate_checker"),
+    ("agent2_duplicate_checker",    "gate1"),
+    # U-turn: Gate1 (col2 row0) → Agent4 (col2 row1) — straight down same column
+    ("gate1",                       "agent4_pmo_router"),
+    # Row 1 trunk (R→L): Agent4 → Agent5 → Agent6
+    ("agent4_pmo_router",           "agent5_business_impact"),
+    ("agent5_business_impact",      "agent6_knowledge_crosscheck"),
+    # U-turn: Agent6 (col0 row1) → Gate2 (col0 row2) — straight down same column
     ("agent6_knowledge_crosscheck", "gate2"),
+    # Row 2 trunk (L→R)
+    ("gate2",                       "agent7_acceptance_handler"),
+    ("agent7_acceptance_handler",   "agent9_dashboard_service"),
+    # U-turn: Agent9 (col2 row2) → Agent10 (col2 row3) — straight down
+    ("agent9_dashboard_service",    "agent10_success_predictor"),
+    # Row 3 trunk (R→L)
+    ("agent10_success_predictor",   "end_accepted"),
+
+    # Exit branches (vertical drops)
+    ("agent1_intake_parser",        "end_incomplete"),
+    ("agent2_duplicate_checker",    "agent3_duplicate_rejection_notifier"),
+    ("agent3_duplicate_rejection_notifier", "end_dup"),
     ("agent6_knowledge_crosscheck", "end_review"),
-    ("gate2", "agent7_acceptance_handler"),
-    ("gate2", "agent8_rejection_feedback_composer"),
-    ("agent7_acceptance_handler", "agent9_dashboard_service"),
-    ("agent9_dashboard_service", "agent10_success_predictor"),
-    ("agent10_success_predictor", "end_accepted"),
+    ("gate2",                       "agent8_rejection_feedback_composer"),
     ("agent8_rejection_feedback_composer", "end_rejected"),
 ]
 
@@ -160,15 +209,8 @@ def render(project_id, replay_pace_ms=5000, redirect_to=None, resume_from=None):
         f'margin-bottom:16px;font-size:14px;font-weight:600">{label}{reason_line}</div>'
     )
 
-    # Notifications are NOT rendered as a panel on this page anymore — the composer's right panel
-    # (scripts/demo_server.py) shows them live via postMessage as replay reaches each triggering
-    # step, so a second static copy here would just be a duplicate. Still queried here because the
-    # notif_feed JSON below (fed to that right panel) is built from these same rows.
     notif_rows = conn.execute("SELECT * FROM notifications WHERE project_id = ? ORDER BY id", (project_id,)).fetchall()
 
-    # Fed to the parent composer page (scripts/demo_server.py) via postMessage as replay proceeds,
-    # so a separate "notifications" panel there can show each one appearing at the exact moment its
-    # triggering step finishes — not just a static end-of-run list.
     notif_feed = [
         {
             "trigger_agent": n["trigger_agent"],
@@ -180,21 +222,14 @@ def render(project_id, replay_pace_ms=5000, redirect_to=None, resume_from=None):
     ]
     notif_feed_json = json.dumps(notif_feed)
 
-    # Original flat list — kept for the execution-log panel and the automated-time summary.
     steps = [{"agent": AGENT_LABELS.get(r["agent"], r["agent"]), "duration_ms": r["duration_ms"]} for r in rows]
     steps_json = json.dumps(steps)
 
-    # Extended path (with virtual gate/end nodes) that drives the graph animation.
     sequence = _build_sequence(raw_agents, durations, status)
     sequence_json = json.dumps(sequence)
     redirect_json = json.dumps(redirect_to)
     resume_from_json = json.dumps(resume_from)
 
-    # The flat `steps`/log-list array (built from raw audit_log rows above) has no "gate2" entry of
-    # its own to look up like the graph's `sequence` does — gates aren't real agent calls. So work
-    # out how many of those raw rows were already shown in the prior partial render by finding the
-    # last row belonging to the real agent that immediately precedes Gate 2 (Agent 6), and fast-
-    # forward the execution log through that many entries too, in sync with the graph.
     resume_step_count = 0
     if resume_from == "gate2":
         for idx, r in enumerate(rows):
@@ -202,62 +237,148 @@ def render(project_id, replay_pace_ms=5000, redirect_to=None, resume_from=None):
                 resume_step_count = idx + 1
     resume_step_count_json = json.dumps(resume_step_count)
 
-    # SVG edges — every structural edge, dim by default; JS lights up the ones this run traversed.
-    # Connect on whichever axis the two nodes are actually separated on, so lateral branches
-    # (e.g. agent2 -> agent3) draw side-to-side instead of running through the node stack below.
+    # ── SVG edges ────────────────────────────────────────────────────────────
+    # For the snake trunk (same-column U-turns), draw a straight vertical line.
+    # For same-row horizontal hops, draw a straight horizontal line.
+    # For exit branches (vertical drop), draw straight vertical line.
+    # A curved elbow path is used only for diagonal connections.
     edge_svg = []
     for a, b in EDGES:
         ax, ay, aw, ah = NODE_POS[a][:4]
         bx, by, bw, bh = NODE_POS[b][:4]
         eid = f"edge_{a}__{b}"
-        if abs(by - ay) >= abs(bx - ax):
-            x1, y1 = ax, ay + ah / 2 if by > ay else ay - ah / 2
-            x2, y2 = bx, by - bh / 2 if by > ay else by + bh / 2
+
+        dx = abs(bx - ax)
+        dy = abs(by - ay)
+
+        if dx < 20:
+            # Vertical connection (same column — U-turn or exit branch)
+            x1, y1 = ax, ay + ah / 2
+            x2, y2 = bx, by - bh / 2
+            edge_svg.append(
+                f'<line id="{eid}" x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+                f'class="edge" marker-end="url(#arrow)"/>'
+            )
+        elif dy < 20:
+            # Horizontal connection (same row)
+            if bx > ax:
+                x1, y1 = ax + aw / 2, ay
+                x2, y2 = bx - bw / 2, by
+            else:
+                x1, y1 = ax - aw / 2, ay
+                x2, y2 = bx + bw / 2, by
+            edge_svg.append(
+                f'<line id="{eid}" x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+                f'class="edge" marker-end="url(#arrow)"/>'
+            )
         else:
-            x1, y1 = ax + aw / 2 if bx > ax else ax - aw / 2, ay
-            x2, y2 = bx - bw / 2 if bx > ax else bx + bw / 2, by
-        edge_svg.append(
-            f'<line id="{eid}" x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" '
-            f'class="edge" marker-end="url(#arrow)"/>'
-        )
+            # Diagonal / elbow — use two-segment path (right-angle elbow)
+            if bx > ax:
+                sx, sy = ax + aw / 2, ay
+                ex, ey = bx - bw / 2, by
+            else:
+                sx, sy = ax - aw / 2, ay
+                ex, ey = bx + bw / 2, by
+            mid_x = (sx + ex) / 2
+            edge_svg.append(
+                f'<path id="{eid}" d="M{sx:.1f},{sy:.1f} L{mid_x:.1f},{sy:.1f} L{mid_x:.1f},{ey:.1f} L{ex:.1f},{ey:.1f}" '
+                f'class="edge" fill="none" marker-end="url(#arrow)"/>'
+            )
+
+    # ── Snake ribbon background path ─────────────────────────────────────────
+    # Draw a thick rounded-rect ribbon behind the trunk to make the S-curve
+    # visually obvious (similar to the green/blue stripe in the reference image).
+    # The ribbon follows: row0 (L→R), down col2, row1 (R→L), down col0, row2 (L→R),
+    # down col2, row3 (R→L).
+    ribbon_pts = [
+        # Row 0: left edge of col0 → right edge of col2
+        (COL_X[0] - NODE_W//2, ROW_Y[0]),
+        (COL_X[2] + NODE_W//2, ROW_Y[0]),
+        # Down col2 to row1
+        (COL_X[2] + NODE_W//2, ROW_Y[1]),
+        (COL_X[0] - NODE_W//2, ROW_Y[1]),
+        # Down col0 to row2
+        (COL_X[0] - NODE_W//2, ROW_Y[2]),
+        (COL_X[2] + NODE_W//2, ROW_Y[2]),
+        # Down col2 to row3
+        (COL_X[2] + NODE_W//2, ROW_Y[3]),
+        (COL_X[0] - NODE_W//2, ROW_Y[3]),
+    ]
+    rh = NODE_H + 16  # ribbon height (a bit taller than nodes)
+    ribbon_segs = []
+    # Row 0 band
+    ribbon_segs.append(
+        f'<rect x="{COL_X[0]-NODE_W//2-8}" y="{ROW_Y[0]-rh//2}" '
+        f'width="{COL_X[2]+NODE_W//2 - (COL_X[0]-NODE_W//2) + 16}" height="{rh}" '
+        f'rx="34" fill="#378ADD" opacity="0.10"/>'
+    )
+    # Row 1 band
+    ribbon_segs.append(
+        f'<rect x="{COL_X[0]-NODE_W//2-8}" y="{ROW_Y[1]-rh//2}" '
+        f'width="{COL_X[2]+NODE_W//2 - (COL_X[0]-NODE_W//2) + 16}" height="{rh}" '
+        f'rx="34" fill="#378ADD" opacity="0.10"/>'
+    )
+    # Row 2 band
+    ribbon_segs.append(
+        f'<rect x="{COL_X[0]-NODE_W//2-8}" y="{ROW_Y[2]-rh//2}" '
+        f'width="{COL_X[2]+NODE_W//2 - (COL_X[0]-NODE_W//2) + 16}" height="{rh}" '
+        f'rx="34" fill="#378ADD" opacity="0.10"/>'
+    )
+    # Row 3 band
+    ribbon_segs.append(
+        f'<rect x="{COL_X[0]-NODE_W//2-8}" y="{ROW_Y[3]-rh//2}" '
+        f'width="{COL_X[2]+NODE_W//2 - (COL_X[0]-NODE_W//2) + 16}" height="{rh}" '
+        f'rx="34" fill="#378ADD" opacity="0.10"/>'
+    )
+    # Vertical connectors between rows (U-turns)
+    vconn_w = NODE_W + 16
+    # right side (col2): row0→row1
+    ribbon_segs.append(
+        f'<rect x="{COL_X[2]-vconn_w//2}" y="{ROW_Y[0]+rh//2-4}" '
+        f'width="{vconn_w}" height="{ROW_Y[1]-ROW_Y[0]-rh+8}" '
+        f'fill="#378ADD" opacity="0.10"/>'
+    )
+    # left side (col0): row1→row2
+    ribbon_segs.append(
+        f'<rect x="{COL_X[0]-vconn_w//2}" y="{ROW_Y[1]+rh//2-4}" '
+        f'width="{vconn_w}" height="{ROW_Y[2]-ROW_Y[1]-rh+8}" '
+        f'fill="#378ADD" opacity="0.10"/>'
+    )
+    # right side (col2): row2→row3
+    ribbon_segs.append(
+        f'<rect x="{COL_X[2]-vconn_w//2}" y="{ROW_Y[2]+rh//2-4}" '
+        f'width="{vconn_w}" height="{ROW_Y[3]-ROW_Y[2]-rh+8}" '
+        f'fill="#378ADD" opacity="0.10"/>'
+    )
+    ribbon_svg = "\n".join(ribbon_segs)
+
     edges_svg_str = "\n".join(edge_svg)
 
-    # Node DOM elements — box/diamond/chip per NODE_POS.
+    # ── Node DOM elements ─────────────────────────────────────────────────────
     node_divs = []
-    for nid, (cx, cy, w, h, shape, label) in NODE_POS.items():
-        lines = label.split("\n")
+    for nid, (cx, cy, w, h, shape, lbl) in NODE_POS.items():
+        lines = lbl.split("\n")
         inner = "<br>".join(lines)
         node_divs.append(
             f'<div class="node {shape}" id="node-{nid}" '
-            f'style="left:{cx-w/2}px;top:{cy-h/2}px;width:{w}px;height:{h}px;">'
+            f'style="left:{cx-w/2:.1f}px;top:{cy-h/2:.1f}px;width:{w}px;height:{h}px;">'
             f'<span>{inner}</span></div>'
         )
     nodes_html = "\n".join(node_divs)
 
-    canvas_w = max(p[0] + p[2] for p in NODE_POS.values()) + 40
-    canvas_h = max(p[1] + p[3] for p in NODE_POS.values()) + 40
+    canvas_w = max(p[0] + p[2]//2 for p in NODE_POS.values()) + 60
+    canvas_h = max(p[1] + p[3]//2 for p in NODE_POS.values()) + 60
 
-    # Only set for a run that's genuinely pending a Manual Gate 2 decision (see run_scenario_to_gate2
-    # in scripts/demo_engine.py) — lets a PMO watch Agents 1-6 actually run in sequence first. This
-    # page never navigates itself to the Gate 2 page — that would replace the flow graph the PMO is
-    # meant to keep watching. Instead it posts a message up to the parent composer, which opens the
-    # decision UI in the RIGHT panel (notifications side), so making the call never interrupts the
-    # view of the flow itself (see scripts/demo_server.py's message listener).
     gate2_link_html = (
         f'<button type="button" id="skip-gate2-btn" style="margin-left:auto;background:none;border:none;'
         f'font-size:13px;color:#378ADD;font-weight:600;cursor:pointer;padding:0">Show Gate 2 decision now →</button>'
         if redirect_to else ""
     )
 
-    # Comments/Notifications pages only exist for project IDs that actually reached a point where
-    # something got rendered for them (e.g. an accepted project) — cases that stop earlier (like
-    # SUB-CASE9, parked mid-flow for the Gate 3 demo) never get those pages written. Linking to a
-    # page that doesn't exist is a dead-end 404 for whoever's driving the demo, so only show each
-    # link if its target file is actually on disk.
     _dash_dir = os.path.dirname(__file__)
     extra_nav_links = "".join(
-        f'<a href="{fname}">{label}</a>'
-        for fname, label in (
+        f'<a href="{fname}">{lnk_label}</a>'
+        for fname, lnk_label in (
             (f"notifications_{project_id}.html", "Notifications"),
         )
         if os.path.exists(os.path.join(_dash_dir, fname))
@@ -265,39 +386,55 @@ def render(project_id, replay_pace_ms=5000, redirect_to=None, resume_from=None):
 
     html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Live Execution Visualizer — {project_id}</title>
 <style>
-body{{font-family:-apple-system,Helvetica,Arial,sans-serif;margin:1.5rem 2rem;color:#2a2a28}}
+body{{font-family:-apple-system,Helvetica,Arial,sans-serif;margin:1.5rem 2rem;color:#2a2a28;background:#fafaf8}}
 h3{{margin-bottom:4px}}
 .nav{{font-size:12px;margin-bottom:10px}}
 .nav a{{color:#378ADD;text-decoration:none;margin-right:14px}}
 .nav a:hover{{text-decoration:underline}}
-#topbar{{display:flex;align-items:center;gap:14px;margin-bottom:14px}}
-#replay-btn{{background:#378ADD;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:14px;cursor:pointer}}
+#topbar{{display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap}}
+#replay-btn{{background:#378ADD;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:14px;cursor:pointer;font-weight:600}}
 #replay-btn:hover{{background:#2c6fb3}}
 #status{{font-size:13px;color:#555;font-family:monospace}}
-#layout{{display:flex;gap:24px;align-items:flex-start}}
-#graph-wrap{{position:relative;width:{canvas_w}px;height:{canvas_h}px;flex-shrink:0}}
-svg#edges{{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}}
-line.edge{{stroke:#ddd;stroke-width:2;transition:stroke .25s,stroke-width .25s}}
-line.edge.lit{{stroke:#378ADD;stroke-width:3}}
-line.edge.lit.done{{stroke:#639922}}
+/* ── Snake diagram wrapper ── */
+#main-wrap{{display:flex;gap:28px;align-items:flex-start}}
+#graph-wrap{{position:relative;flex-shrink:0}}
+svg#edges{{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible}}
+line.edge,path.edge{{stroke:#ccc;stroke-width:2;transition:stroke .25s,stroke-width .25s;fill:none}}
+line.edge.lit,path.edge.lit{{stroke:#378ADD;stroke-width:3}}
+line.edge.lit.done,path.edge.lit.done{{stroke:#639922}}
+/* ── Node cards ── */
 .node{{position:absolute;display:flex;align-items:center;justify-content:center;text-align:center;
-  font-size:12px;line-height:1.3;border-radius:8px;background:#f5f4f0;border:1.5px solid #e5e3dc;
-  color:#999;transition:background .3s,border-color .3s,color .3s;box-sizing:border-box;padding:4px}}
-.node.diamond{{border-radius:0;transform:rotate(45deg)}}
-.node.diamond span{{transform:rotate(-45deg);font-weight:600}}
-.node.chip{{border-radius:20px;font-size:11px;font-style:italic}}
-.node.active{{background:#e6f1fb;border-color:#378ADD;color:#1a1a1a;box-shadow:0 0 0 3px rgba(55,138,221,.15)}}
-.node.complete{{background:#eaf3de;border-color:#639922;color:#1a1a1a}}
-#log{{flex:1;min-width:280px;max-width:340px;font-size:13px}}
-#log h4{{margin:0 0 8px}}
+  font-size:11px;line-height:1.35;border-radius:10px;
+  background:#fff;border:2px solid #e0ddd5;
+  color:#aaa;transition:background .3s,border-color .3s,color .3s,box-shadow .3s;
+  box-sizing:border-box;padding:6px 8px;
+  box-shadow:0 1px 4px rgba(0,0,0,.06)}}
+.node .step-num{{display:block;font-size:9px;font-weight:700;letter-spacing:.05em;
+  color:#bbb;margin-bottom:2px;text-transform:uppercase}}
+.node.diamond{{border-radius:0;transform:rotate(45deg);background:#fff5e0;border-color:#e8c96a}}
+.node.diamond span{{transform:rotate(-45deg);font-weight:700;font-size:11px}}
+.node.chip{{border-radius:20px;font-size:10px;font-style:italic;background:#f0f0ec;border-color:#ddd}}
+.node.active{{background:#e6f1fb;border-color:#378ADD;color:#1a1a1a;
+  box-shadow:0 0 0 4px rgba(55,138,221,.18),0 2px 8px rgba(55,138,221,.12)}}
+.node.diamond.active{{background:#e6f1fb;border-color:#378ADD}}
+.node.complete{{background:#eaf3de;border-color:#639922;color:#2a2a28;
+  box-shadow:0 1px 4px rgba(99,153,34,.10)}}
+.node.diamond.complete{{background:#eaf3de;border-color:#639922}}
+/* ── Execution log panel ── */
+#log{{flex:1;min-width:240px;max-width:300px;font-size:13px}}
+#log h4{{margin:0 0 10px;font-size:13px;color:#444}}
 #log-list{{list-style:none;margin:0;padding:0;border-left:2px solid #e5e3dc}}
-#log-list li{{padding:6px 0 6px 14px;color:#bbb;font-family:monospace;font-size:12px;border-left:2px solid transparent;margin-left:-2px}}
+#log-list li{{padding:5px 0 5px 14px;color:#bbb;font-family:monospace;font-size:11px;
+  border-left:2px solid transparent;margin-left:-2px;transition:color .2s}}
 #log-list li.active{{color:#378ADD;border-left-color:#378ADD}}
-#log-list li.complete{{color:#333;border-left-color:#639922}}
-#summary{{margin-top:16px;font-size:13px;color:#555}}
-.legend{{margin-top:10px;font-size:11px;color:#888;display:flex;gap:16px}}
+#log-list li.complete{{color:#444;border-left-color:#639922}}
+#summary{{margin-top:14px;font-size:12px;color:#777;line-height:1.5}}
+.legend{{margin-top:12px;font-size:11px;color:#999;display:flex;gap:16px;flex-wrap:wrap}}
 .legend span{{display:inline-flex;align-items:center;gap:5px}}
 .sw{{width:10px;height:10px;border-radius:3px;display:inline-block}}
+/* ── Row direction labels ── */
+.row-label{{position:absolute;font-size:9px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:#aaa;pointer-events:none}}
 </style></head><body>
 <div class="nav"><a href="/" target="_top">← Composer</a>
 {extra_nav_links}</div>
@@ -308,11 +445,21 @@ line.edge.lit.done{{stroke:#639922}}
   <span id="status">Ready.</span>
   {gate2_link_html}
 </div>
-<div id="layout">
-  <div id="graph-wrap">
+<div id="main-wrap">
+  <div id="graph-wrap" style="width:{canvas_w}px;height:{canvas_h}px;">
     <svg id="edges" viewBox="0 0 {canvas_w} {canvas_h}">
-      <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-        <path d="M0,0 L8,4 L0,8 Z" fill="#bbb"/></marker></defs>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#bbb"/>
+        </marker>
+        <marker id="arrow-lit" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#378ADD"/>
+        </marker>
+        <marker id="arrow-done" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#639922"/>
+        </marker>
+      </defs>
+      {ribbon_svg}
       {edges_svg_str}
     </svg>
     {nodes_html}
@@ -323,11 +470,11 @@ line.edge.lit.done{{stroke:#639922}}
     <div class="legend">
       <span><i class="sw" style="background:#378ADD"></i>running</span>
       <span><i class="sw" style="background:#639922"></i>done</span>
-      <span><i class="sw" style="background:#e5e3dc"></i>not on this path</span>
+      <span><i class="sw" style="background:#e5e3dc"></i>not on path</span>
     </div>
+    <div id="summary"></div>
   </div>
 </div>
-<div id="summary"></div>
 <script>
 const sequence = {sequence_json};
 const steps = {steps_json};
@@ -336,25 +483,12 @@ const pace = {replay_pace_ms};
 const redirectTo = {redirect_json};
 const resumeFrom = {resume_from_json};
 const resumeStepCount = {resume_step_count_json};
-// Index of the last node already shown in a prior partial render (see render_visualizer.py's
-// resume_from docstring) — everything up to and including it fast-forwards with no delay below;
-// -1 (not found / not set) means play the whole thing at normal pace, as usual.
 const resumeIndex = resumeFrom ? sequence.findIndex(n => n.id === resumeFrom) : -1;
 
 function tellParent(msg) {{
   try {{ window.parent.postMessage(msg, '*'); }} catch (e) {{}}
 }}
 
-// Never navigates THIS page — the composer (scripts/demo_server.py) opens the Gate 2 decision UI
-// in the right panel instead, so the flow graph here stays visible the whole time a PMO is
-// deciding. Also wired to the "Show Gate 2 decision now" button for anyone who doesn't want to
-// wait out the replay.
-//
-// redirectTo is a bare filename (e.g. "gate2_SUB-0001.html") — relative to THIS page's own URL
-// (/dashboard/visualizer_...), which is why it worked fine back when this page navigated itself
-// to it directly. Posted up to the parent composer's right panel instead, a bare relative path
-// resolves against the PARENT page's URL ("/") rather than "/dashboard/" and 404s — hence the
-// absolute "/dashboard/" prefix here.
 function showGate2Decision() {{
   if (redirectTo) tellParent({{type: 'gate2_pending', gate2_url: '/dashboard/' + redirectTo}});
 }}
@@ -385,8 +519,6 @@ function playGraph(i) {{
       const edgeEl = document.getElementById('edge_' + prevId + '__' + sequence[i].id);
       if (edgeEl) {{ edgeEl.classList.remove('lit'); edgeEl.classList.add('lit','done'); }}
     }}
-    // The step that just finished may have triggered a notification — surface it now, in sync
-    // with the graph, rather than only in the static list at the top of this page.
     notifFeed.filter(n => n.trigger_agent === prevId).forEach(n => tellParent({{type: 'notification', notif: n}}));
   }}
   if (i >= sequence.length) {{
@@ -406,9 +538,6 @@ function playGraph(i) {{
     if (edgeEl) edgeEl.classList.add('lit');
   }}
   document.getElementById('status').innerText = 'Running: ' + node.label.replace('\\n', ' ');
-  // Already-seen nodes (0..resumeIndex, from a prior partial render) fast-forward with no delay;
-  // the first genuinely new node onward (e.g. Agent 7 right after a Gate 2 accept) plays at the
-  // normal pace, same as a from-scratch run.
   const delay = (i <= resumeIndex) ? 0 : pace;
   setTimeout(() => playGraph(i+1), delay);
 }}
@@ -428,8 +557,6 @@ function playStep(i) {{
     li.classList.add('active');
     li.textContent = steps[i].agent + ' — ' + steps[i].duration_ms + 'ms';
   }}
-  // Same fast-forward as playGraph, kept in sync: entries before resumeStepCount were already in
-  // the log during the prior partial render.
   const delay = (i < resumeStepCount) ? 0 : pace;
   setTimeout(() => playStep(i+1), delay);
 }}

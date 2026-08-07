@@ -3,7 +3,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.db.client import get_connection
 from src.db.trial_loader import load_trial_data
-from src.orchestration.pipeline import run_submission
+from src.orchestration.pipeline import run_submission, Gate2OverrideRequiredError
 from src.agents.agent1_intake_parser import parse_intake, PROJECT_001_EMAIL, PROJECT_001_MOCK_RESPONSE
 from src.agents.agent10_success_predictor import compute_success_score
 from src.notifications.templates import intake_acknowledgment
@@ -44,12 +44,25 @@ mocks1 = {"agent5": {"margin_impact": "positive", "citation": "New initiatives a
 t1 = run_submission(conn, s1, curated_existing, mocks1)
 check("3.2 scenario 1 -> accepted", t1["final_status"] == "accepted", t1["final_status"])
 
-# scenario 3: rejected, misaligned
+# scenario 3: rejected, misaligned — and (post-teammate merge, 2026-08-06) a PMO CAN override a
+# misaligned verdict at accept-time, but only with a real reason, checked server-side in
+# resume_after_gate2()/run_submission() (Gate2OverrideRequiredError), not just the Gate 2 page's
+# own client-side form validation — see src/orchestration/pipeline.py's Gate2OverrideRequiredError
+# docstring for why a UI-only requirement isn't good enough on its own.
 s3 = get(idx["3_rejected_misaligned_business_direction"])
 mocks3 = {"agent5": {"margin_impact": "unclear", "citation": "New initiatives are expected to demonstrate a credible path to at least 15% margin within 18 months of launch"},
           "agent6": {"verdict": "misaligned", "citation": "Consumer-facing new product lines outside existing verticals"}}
-t3 = run_submission(conn, s3, curated_existing, mocks3)
+t3 = run_submission(conn, s3, curated_existing, mocks3, gate2_decision="reject")
 check("3.2 scenario 3 -> rejected (misaligned)", t3["final_status"] == "rejected" and "aligned" in t3["rejection_reason"].lower(), t3.get("rejection_reason"))
+
+try:
+    run_submission(conn, s3, curated_existing, mocks3)
+    check("3.2 accepting a misaligned verdict with no override reason is refused, not silently allowed", False)
+except Gate2OverrideRequiredError:
+    check("3.2 accepting a misaligned verdict with no override reason is refused, not silently allowed", True)
+
+t3_override = run_submission(conn, s3, curated_existing, mocks3, pmo_override_reason="Board-approved strategic exception.")
+check("3.2 a real PMO override reason lets a misaligned verdict actually accept", t3_override["final_status"] == "accepted", t3_override["final_status"])
 
 # scenario 4: under review
 s4 = get(idx["4_under_review_unknown_regulatory_risk"])

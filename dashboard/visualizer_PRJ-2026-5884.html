@@ -1,4 +1,4 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>Live Execution Visualizer — PRJ-2026-0791</title>
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Live Execution Visualizer — PRJ-2026-5884</title>
 <style>
 body{font-family:-apple-system,Helvetica,Arial,sans-serif;margin:1.5rem 2rem;color:#2a2a28;background:#fafaf8}
 h3{margin-bottom:4px}
@@ -52,8 +52,8 @@ line.edge.lit.done,path.edge.lit.done{stroke:#639922}
 </style></head><body>
 <div class="nav"><a href="/" target="_top">← Composer</a>
 </div>
-<h3>Live Execution Visualizer — PRJ-2026-0791</h3>
-<div id="status-banner" style="background:#fcebeb;color:#a32d2d;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px;font-weight:600">✗ Rejected</div>
+<h3>Live Execution Visualizer — PRJ-2026-5884</h3>
+<div id="status-banner" style="background:#eaf3de;color:#3b6d11;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px;font-weight:600">✓ Accepted</div>
 <div id="topbar">
   <button id="replay-btn" onclick="startReplay()">▶ Replay</button>
   <span id="status">Ready.</span>
@@ -127,13 +127,13 @@ line.edge.lit.done,path.edge.lit.done{stroke:#639922}
   </div>
 </div>
 <script>
-const sequence = [{"id": "agent1_intake_parser", "label": "Agent 1 \u00b7 Intake parser", "duration_ms": 0, "kind": "agent"}, {"id": "agent2_duplicate_checker", "label": "Agent 2 \u00b7 Duplicate checker", "duration_ms": 0, "kind": "agent"}, {"id": "gate1", "label": "Gate 1 \u00b7 Proceed", "duration_ms": 0, "kind": "gate"}, {"id": "agent4_pmo_router", "label": "Agent 4 \u00b7 PMO router / acknowledgment", "duration_ms": 0, "kind": "agent"}, {"id": "agent5_business_impact", "label": "Agent 5 \u00b7 Business impact", "duration_ms": 0, "kind": "agent"}, {"id": "agent6_knowledge_crosscheck", "label": "Agent 6 \u00b7 Knowledge cross-check", "duration_ms": 0, "kind": "agent"}, {"id": "gate2", "label": "Gate 2 \u00b7 PMO Decision", "duration_ms": 0, "kind": "gate"}, {"id": "agent8_rejection_feedback_composer", "label": "Agent 8 \u00b7 Rejection feedback", "duration_ms": 0, "kind": "agent"}, {"id": "end_rejected", "label": "\u2717 Rejected", "duration_ms": 0, "kind": "end"}];
-const steps = [{"agent": "Agent 1 \u00b7 Intake parser", "duration_ms": 0}, {"agent": "Agent 1 \u00b7 Intake parser", "duration_ms": 0}, {"agent": "Agent 2 \u00b7 Duplicate checker", "duration_ms": 0}, {"agent": "Agent 4 \u00b7 PMO router / acknowledgment", "duration_ms": 0}, {"agent": "Agent 5 \u00b7 Business impact", "duration_ms": 0}, {"agent": "Agent 6 \u00b7 Knowledge cross-check", "duration_ms": 0}, {"agent": "Agent 8 \u00b7 Rejection feedback", "duration_ms": 0}];
-const notifFeed = [{"trigger_agent": "agent1_intake_parser", "trigger_label": "Agent 1 \u00b7 Intake parser", "recipient": "Grace Lim", "channel": "email", "subject": "Submission received \u2014 \"Customer support AI triage\" is under review", "body": "Thank you for submitting \"Customer support AI triage\" to the Enterprise Project Management Office (PMO).\n\nYour submission has been received and is now under review. We will follow up with next steps as soon as the review is complete.\n\nBest regards,\nEnterprise PMO team"}, {"trigger_agent": "agent4_pmo_router", "trigger_label": "Agent 4 \u00b7 PMO router / acknowledgment", "recipient": "PMO Team", "channel": "email", "subject": "New submission for review \u2014 Customer support AI triage", "body": "A new project submission has been received and requires PMO awareness.\n\nProject: \"Customer support AI triage\" (PRJ-2026-0791)\nSubmitted by: Grace Lim\n\nAgent 5 (Business Impact) and Agent 6 (Knowledge Cross-Check) are now analyzing it. It will reach Manual Gate 2 for a PMO accept/reject decision once that analysis completes.\n\n\u2014 Automated PMO intake system"}, {"trigger_agent": "agent8_rejection_feedback_composer", "trigger_label": "Agent 8 \u00b7 Rejection feedback", "recipient": "Grace Lim", "channel": "email", "subject": "Update on your proposal: Customer support AI triage", "body": "Your proposal \"Customer support AI triage\" was not accepted at this time.\n\nReason: PMO rejected at Gate 2\n\nSuggested next step: Contact PMO for specific improvement guidance.\n\nBest regards,\nEnterprise PMO team"}];
+const sequence = [];
+const steps = [{"agent": "Agent 7 \u00b7 Acceptance handler", "duration_ms": 0}, {"agent": "Agent 9 \u00b7 Dashboard publish", "duration_ms": 0}, {"agent": "Agent 10 \u00b7 Success predictor", "duration_ms": 0}];
+const notifFeed = [{"trigger_agent": "agent7_acceptance_handler", "trigger_label": "Agent 7 \u00b7 Acceptance handler", "recipient": "Omar Hassan", "channel": "email", "subject": "Accepted \u2014 PRJ-2026-5884", "body": "Good news \u2014 \"Consumer subscription box pilot\" has been accepted.\n\nProject ID: PRJ-2026-5884\nTrack progress on the dashboard: https://pmo.internal/dashboard\n\nPMO note: [PMO override: CEO Approved] \u2014 CEO Approve\n\nBest regards,\nEnterprise PMO team"}, {"trigger_agent": "agent10_success_predictor", "trigger_label": "Agent 10 \u00b7 Success predictor", "recipient": "Omar Hassan", "channel": "email", "subject": "Under monitoring \u2014 PRJ-2026-5884", "body": "\"Consumer subscription box pilot\" (PRJ-2026-5884) has entered tracking.\n\nStatus: Under monitoring \u2014 a success forecast isn't available yet. Once this project has been active long enough to accrue real financial, milestone, and resource tracking data, Agent 10 will start scoring it on the dashboard.\n\nBest regards,\nEnterprise PMO team"}];
 const pace = 5000;
 const redirectTo = null;
 const resumeFrom = "gate2";
-const resumeStepCount = 6;
+const resumeStepCount = 0;
 const resumeIndex = resumeFrom ? sequence.findIndex(n => n.id === resumeFrom) : -1;
 
 function tellParent(msg) {

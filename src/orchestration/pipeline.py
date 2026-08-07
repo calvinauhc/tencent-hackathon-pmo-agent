@@ -14,6 +14,17 @@ default that's silently applied.
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.agents.agent1_intake_parser import REQUIRED_FIELDS
+
+
+class Gate2OverrideRequiredError(Exception):
+    """Raised by resume_after_gate2() when a PMO tries to accept a project whose Agent 6 verdict
+    isn't aligned/partially_aligned without providing a real pmo_override_reason. Mirrors
+    dashboard/render_gate2.py's client-side requirement (the Accept form won't submit without one)
+    so the rule is also enforced here, in code — same §8.2 guardrail 3 principle every other
+    hard-coded business rule in this pipeline follows: a UI requirement alone is bypassable by
+    anyone who can POST directly to the route, so it has to be real here too, not just in the form."""
+    pass
+
 from src.agents.agent2_duplicate_checker import check_duplicate
 from src.agents.agent5_business_impact_analyzer import analyze_business_impact
 from src.agents.agent6_knowledge_crosschecker import cross_check
@@ -159,7 +170,7 @@ def default_gate2_rejection_reason(a6_out):
 
 
 def resume_after_gate2(conn, project, trace, gate2_decision, override_reason=None, pmo_comment="",
-                        gate2_batch_id=None, exception_reason=None):
+                        gate2_batch_id=None, exception_reason=None, pmo_override_reason=None):
     """
     Completes the flow once an actual PMO decision has been made at Manual Gate 2. `trace` must be
     the dict returned by run_intake_to_gate2() with final_status == "pending_gate2" (it carries
@@ -172,7 +183,13 @@ def resume_after_gate2(conn, project, trace, gate2_decision, override_reason=Non
 
     On accept, `pmo_comment` is the same idea in the other direction — an optional note (praise, a
     watch-out, a condition to track post-acceptance) appended to the acceptance notification and
-    logged on Agent 7's audit_log entry. Never required; a plain accept works exactly as before.
+    logged on Agent 7's audit_log entry. Never required; a plain accept works exactly as before
+    when Agent 6's verdict is aligned/partially_aligned.
+
+    `pmo_override_reason` — required, and checked here (not just in the Gate 2 page's form), when
+    accepting a project whose verdict is anything else (misaligned/inconclusive/unset-but-decided).
+    Raises Gate2OverrideRequiredError if it's missing or blank on that path; the caller (scripts/
+    demo_server.py) turns that into a real 400 to the PMO rather than silently accepting.
 
     `gate2_batch_id`/`exception_reason` (§5.3) — which weekly sitting this was decided in, if any,
     and why it was decided outside one (policy fast-track or a logged PMO override), stamped onto
@@ -181,7 +198,13 @@ def resume_after_gate2(conn, project, trace, gate2_decision, override_reason=Non
     a6_out = trace["agent6"]
     batch_meta = {"gate2_batch_id": gate2_batch_id, "exception_reason": exception_reason}
 
-    if gate2_decision == "accept" and a6_out["verdict"] in ("aligned", "partially_aligned"):
+    if gate2_decision == "accept":
+        verdict = a6_out.get("verdict", "")
+        needs_override = verdict not in ("aligned", "partially_aligned") and verdict != ""
+        if needs_override and not (pmo_override_reason or "").strip():
+            raise Gate2OverrideRequiredError(
+                f"Agent 6 verdict is '{verdict}' — accepting requires a non-empty pmo_override_reason."
+            )
         new_status = accept_project(conn, project.submission_id, "accept")
         row = conn.execute("SELECT project_id FROM projects WHERE submission_id = ?", (project.submission_id,)).fetchone()
         # Idempotent, same rule as before: reuse an existing project_id rather than issuing a new
@@ -225,15 +248,20 @@ def resume_after_gate2(conn, project, trace, gate2_decision, override_reason=Non
     return trace
 
 
-def run_submission(conn, project, existing_projects, mocks: dict, gate1_decision="proceed", gate2_decision="accept"):
+def run_submission(conn, project, existing_projects, mocks: dict, gate1_decision="proceed", gate2_decision="accept",
+                    pmo_override_reason=None):
     """
     Convenience wrapper for callers that don't need Gate 2 to be a real pause (CLI demo script,
     tests): runs intake through Gate 2 and, if it lands on "pending_gate2", immediately resolves it
     using `gate2_decision` as if a PMO had already decided. The in-browser composer
     (scripts/demo_server.py) does NOT use this — it calls run_intake_to_gate2() and
     resume_after_gate2() separately so Gate 2 is an actual stop with a real button click in between.
+
+    `pmo_override_reason` forwards straight to resume_after_gate2() — required, and actually
+    checked, when `gate2_decision="accept"` against a non-aligned Agent 6 verdict; omitting it there
+    raises Gate2OverrideRequiredError, same as a bare POST to the real accept route would.
     """
     trace = run_intake_to_gate2(conn, project, existing_projects, mocks, gate1_decision)
     if trace.get("final_status") == "pending_gate2":
-        trace = resume_after_gate2(conn, project, trace, gate2_decision)
+        trace = resume_after_gate2(conn, project, trace, gate2_decision, pmo_override_reason=pmo_override_reason)
     return trace

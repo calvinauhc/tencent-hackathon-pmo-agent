@@ -59,6 +59,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from src.db.client import get_connection
 from dashboard.render_gate2_queue import render_queue_fragment
 from dashboard.render_active_projects import render_active_fragment
+from src.orchestration.pipeline import Gate2OverrideRequiredError
 # Note: run_batch_case/review_queued_project/override_queued_project/open_batch/close_batch and
 # their /batch/, /queue/* HTTP routes below are kept fully wired even though the "Periodic Gate 2
 # Review" left-panel dropdown entry that used to trigger cases 8a/8b/9/10 by button is gone (per an
@@ -71,16 +72,30 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DASHBOARD_DIR = os.path.join(REPO_ROOT, "dashboard")
 PORT = 8765
 
-# Submissions currently sitting at Manual Gate 2, waiting on a real PMO decision. Keyed by
-# submission_id. This server is a single local process for one person's own demo session, so an
-# in-memory dict is enough — no need for persistence across restarts.
-PENDING = {}
+# ── Persistent PENDING / RESOLVED ────────────────────────────────────────────
+# Persisted to a JSON file so a server restart doesn't wipe Gate 2 state that
+# was set up in a prior run — the PMO can restart the server and still Accept /
+# Reject / Hold without having to re-run the case from scratch.
+_STATE_FILE = os.path.join(REPO_ROOT, ".pending_state.json")
 
-# Once a Gate 2 decision has been made, remember the result. A refresh, a double-click, or the
-# iframe re-submitting the form (browser back/forward) would otherwise hit a "no pending decision
-# found" error even though the decision already went through — that reads as "nothing happened"
-# even when it did. Redirecting to the same result instead makes the decision idempotent.
-RESOLVED = {}
+def _load_state():
+    if os.path.exists(_STATE_FILE):
+        try:
+            with open(_STATE_FILE) as f:
+                d = json.load(f)
+            return d.get("pending", {}), d.get("resolved", {})
+        except Exception:
+            pass
+    return {}, {}
+
+def _save_state():
+    try:
+        with open(_STATE_FILE, "w") as f:
+            json.dump({"pending": PENDING, "resolved": RESOLVED}, f)
+    except Exception:
+        pass
+
+PENDING, RESOLVED = _load_state()
 
 PAGE_CSS = """
 * { box-sizing: border-box; }
@@ -688,6 +703,7 @@ class Handler(BaseHTTPRequestHandler):
                 PENDING[result["submission_id"]] = {
                     "project": result["project"], "trace": result["trace"], "scenario_key": key,
                 }
+                _save_state()
                 self._redirect(f"/dashboard/visualizer_{result['visualizer_id']}.html")
             else:
                 self._redirect(f"/dashboard/visualizer_{result['result_id']}.html")
@@ -706,6 +722,7 @@ class Handler(BaseHTTPRequestHandler):
                 PENDING[result["submission_id"]] = {
                     "project": result["project"], "trace": result["trace"], "scenario_key": None,
                 }
+                _save_state()
                 self._redirect(f"/dashboard/visualizer_{result['visualizer_id']}.html")
             else:
                 self._redirect(f"/dashboard/visualizer_{result['result_id']}.html")
@@ -766,6 +783,7 @@ class Handler(BaseHTTPRequestHandler):
                 # is no different, or the held project silently wouldn't show up until something
                 # else happened to trigger a re-render.
                 PENDING.pop(submission_id, None)
+                _save_state()
                 render_gate2_queue()
                 self._send_json({"redirect": "/dashboard/gate2_queue.html"})
                 return
@@ -780,13 +798,33 @@ class Handler(BaseHTTPRequestHandler):
                                   "(the server may have restarted since this case was run)."}, 404)
                 return
             form = self._read_form_body()
-            result = resume_scenario(
-                pending["project"], pending["trace"], decision,
-                scenario_key=pending["scenario_key"],
-                override_reason=form.get("reason"), pmo_comment=form.get("pmo_comment", ""),
-                gate2_batch_id=pending.get("gate2_batch_id"), exception_reason=pending.get("exception_reason"),
-            )
+            # For a PMO override-accept (Agent 6 verdict was misaligned/inconclusive),
+            # the Gate 2 form sends pmo_override_reason as a required field; merge it into
+            # pmo_comment so it's visible in the acceptance notification, prefixed clearly. Also
+            # passed through as its own kwarg below — resume_after_gate2() checks it for real
+            # (Gate2OverrideRequiredError, not just this form's own JS validation), since a client
+            # requirement alone is bypassable by anyone who POSTs here directly.
+            pmo_override = form.get("pmo_override_reason", "").strip()
+            pmo_comment = form.get("pmo_comment", "").strip()
+            if pmo_override:
+                pmo_comment = f"[PMO override: {pmo_override}]" + (f" — {pmo_comment}" if pmo_comment else "")
+            try:
+                result = resume_scenario(
+                    pending["project"], pending["trace"], decision,
+                    scenario_key=pending["scenario_key"],
+                    override_reason=form.get("reason"), pmo_comment=pmo_comment,
+                    gate2_batch_id=pending.get("gate2_batch_id"), exception_reason=pending.get("exception_reason"),
+                    pmo_override_reason=pmo_override,
+                )
+            except Gate2OverrideRequiredError as e:
+                # Validation failed — put the pending decision back exactly as it was (this session's
+                # PENDING already popped it above) so the PMO can retry with a real reason instead of
+                # the case silently disappearing from the queue.
+                PENDING[submission_id] = pending
+                self._send_json({"error": str(e)}, 400)
+                return
             RESOLVED[submission_id] = result["result_id"]
+            _save_state()
             self._send_json({"redirect": f"/dashboard/visualizer_{result['result_id']}.html"})
             return
 
@@ -824,6 +862,7 @@ class Handler(BaseHTTPRequestHandler):
                     "project": result["project"], "trace": result["trace"], "scenario_key": None,
                     "exception_reason": result.get("exception_reason"),
                 }
+                _save_state()
             self._redirect(result["redirect"])
             return
 
@@ -838,6 +877,7 @@ class Handler(BaseHTTPRequestHandler):
                 "project": result["project"], "trace": result["trace"], "scenario_key": None,
                 "gate2_batch_id": result.get("gate2_batch_id"), "exception_reason": result.get("exception_reason"),
             }
+            _save_state()
             self._redirect(result["redirect"])
             return
 

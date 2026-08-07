@@ -78,11 +78,21 @@ def _budget_flag_html(bf):
 def render(submission_id, project, trace):
     a5 = trace.get("agent5", {})
     a6 = trace.get("agent6", {})
-    can_accept = a6.get("verdict") in ("aligned", "partially_aligned")
-    disabled_note = ""
-    if not can_accept:
-        disabled_note = ('<p style="font-size:12px;color:#a32d2d;margin-top:8px">Agent 6 verdict is '
-                          "'misaligned' — Accept is disabled; this can only be rejected or sent back for review.</p>")
+    verdict = a6.get("verdict", "")
+    needs_override = verdict not in ("aligned", "partially_aligned") and verdict != ""
+    override_note = ""
+    if needs_override:
+        override_note = (
+            f'<p style="font-size:12px;color:#854f0b;margin-top:8px;margin-bottom:0">'
+            f'Agent 6 verdict is <b>\'{verdict}\'</b> — PMO override required to accept. '
+            f'Fill in an override reason below before pressing Accept.</p>'
+            f'<div style="margin-top:8px">'
+            f'<label style="font-size:12px;font-weight:600;color:#5f5e5a;display:block;margin-bottom:4px">'
+            f'PMO override reason (required — why are you accepting despite the agent verdict?)</label>'
+            f'<textarea id="override-reason-field" rows="2" placeholder="e.g. CEO directive; strategic exception approved at board level…" '
+            f'style="width:100%;box-sizing:border-box;border:1px solid #e8c96a;border-radius:6px;padding:8px;font-size:13px;font-family:inherit;margin-bottom:4px"></textarea>'
+            f'</div>'
+        )
     proposed_reason = html_lib.escape(default_gate2_rejection_reason(a6))
     budget_flag_html = _budget_flag_html(a5.get("budget_flag"))
     spp = a5.get("similar_past_project")
@@ -125,9 +135,9 @@ availability is tracked the same way as risk and schedule
 <div class="accept-panel">
   <label>PMO comment (optional — included in the acceptance notification, e.g. praise or a watch-out to track post-acceptance)</label>
   <textarea id="accept-comment-field" rows="2" placeholder="e.g. great margin story here; keep an eye on the Q3 staffing dependency..."></textarea>
-  <button type="button" class="accept" id="accept-btn" {'disabled' if not can_accept else ''}>✓ Accept</button>
+  <button type="button" class="accept" id="accept-btn">✓ Accept</button>
 </div>
-{disabled_note}
+{override_note}
 <div class="reject-panel">
   <label>Reason for rejection (Agent 8's proposed reason — edit if you want something different)</label>
   <textarea id="reason-field" rows="2">{proposed_reason}</textarea>
@@ -152,6 +162,21 @@ function submitDecision(decision) {{
   const body = new URLSearchParams();
   if (decision === 'accept') {{
     body.set('pmo_comment', document.getElementById('accept-comment-field').value);
+    const overrideField = document.getElementById('override-reason-field');
+    if (overrideField) {{
+      const overrideReason = overrideField.value.trim();
+      if (!overrideReason) {{
+        statusEl.innerText = '';
+        overrideField.style.border = '2px solid #a32d2d';
+        overrideField.focus();
+        document.getElementById('accept-btn').disabled = false;
+        document.getElementById('reject-btn').disabled = false;
+        document.getElementById('hold-btn').disabled = false;
+        alert('Please fill in a PMO override reason before accepting.');
+        return;
+      }}
+      body.set('pmo_override_reason', overrideReason);
+    }}
   }}
   if (decision === 'reject') {{
     body.set('reason', document.getElementById('reason-field').value);
