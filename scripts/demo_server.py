@@ -43,7 +43,7 @@ straight through with no decision step at all.
 Usage:  python3 scripts/demo_server.py            (serves on http://127.0.0.1:8765)
 Local-only by design (binds 127.0.0.1) — this is a demo tool for your own machine, not a deployment.
 """
-import sys, os, re, html, json, urllib.parse
+import sys, os, re, html, json, time, urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -825,7 +825,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             RESOLVED[submission_id] = result["result_id"]
             _save_state()
-            self._send_json({"redirect": f"/dashboard/visualizer_{result['result_id']}.html"})
+            # Append a cache-busting timestamp so the browser always reloads the freshly-
+            # regenerated HTML even when the result_id (filename) is the same as before.
+            self._send_json({"redirect": f"/dashboard/visualizer_{result['result_id']}.html?t={int(time.time())}"})
             return
 
         if parsed.path.startswith("/change/"):
