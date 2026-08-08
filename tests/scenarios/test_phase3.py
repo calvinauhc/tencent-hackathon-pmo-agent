@@ -64,12 +64,27 @@ except Gate2OverrideRequiredError:
 t3_override = run_submission(conn, s3, curated_existing, mocks3, pmo_override_reason="Board-approved strategic exception.")
 check("3.2 a real PMO override reason lets a misaligned verdict actually accept", t3_override["final_status"] == "accepted", t3_override["final_status"])
 
-# scenario 4: under review
+# scenario 4: inconclusive verdict — (post-teammate merge, 2026-08-08) this used to short-circuit
+# to a bare "under review" status with no real path to a PMO decision at all. It now reaches Gate
+# 2 like every other verdict, gated by the same Gate2OverrideRequiredError guardrail scenario 3
+# exercises above: reject works with a grounded, Agent-6-citation-based reason out of the box;
+# accept requires a real pmo_override_reason.
 s4 = get(idx["4_under_review_unknown_regulatory_risk"])
 mocks4 = {"agent5": {"margin_impact": "unclear", "citation": "New initiatives are expected to demonstrate a credible path to at least 15% margin within 18 months of launch"},
           "agent6": {"verdict": "inconclusive", "citation": "unknown or unquantified regulatory risk defaults to"}}
-t4 = run_submission(conn, s4, curated_existing, mocks4)
-check("3.2 scenario 4 -> under review", t4["final_status"] == "pmo_review (under review)", t4["final_status"])
+t4 = run_submission(conn, s4, curated_existing, mocks4, gate2_decision="reject")
+check("3.2 scenario 4 -> rejected (inconclusive, grounded reason)",
+      t4["final_status"] == "rejected" and "inconclusive" not in t4.get("rejection_reason","").lower() and "unknown or unquantified regulatory risk defaults to" in t4.get("rejection_reason",""),
+      t4.get("rejection_reason"))
+
+try:
+    run_submission(conn, s4, curated_existing, mocks4)
+    check("3.2 accepting an inconclusive verdict with no override reason is refused, not silently allowed", False)
+except Gate2OverrideRequiredError:
+    check("3.2 accepting an inconclusive verdict with no override reason is refused, not silently allowed", True)
+
+t4_override = run_submission(conn, s4, curated_existing, mocks4, pmo_override_reason="Board-approved strategic exception.")
+check("3.2 a real PMO override reason lets an inconclusive verdict actually accept", t4_override["final_status"] == "accepted", t4_override["final_status"])
 
 # scenario 5: incomplete (real email) — handled by Agent 1 before pipeline
 out5, _ = parse_intake(PROJECT_001_EMAIL, mock_response=PROJECT_001_MOCK_RESPONSE)

@@ -553,6 +553,7 @@ function playGraph(i) {{
     }} else {{
       document.getElementById('status').innerText = 'Done.';
     }}
+    tellParent({{type: 'done'}});
     return;
   }}
   const node = sequence[i];

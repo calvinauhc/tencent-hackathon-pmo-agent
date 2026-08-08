@@ -60,6 +60,24 @@ def pmo_new_submission_alert(project_name: str, submitter_name: str, project_id:
     )
     return {"subject": f"New submission for review — {project_name}", "body": body}
 
+def pmo_auto_resolved_alert(project_name: str, project_id: str, submitter_name: str, reason: str) -> dict:
+    """PMO-facing visibility notice for a submission that never reached Agent 4/Gate 2 at all —
+    duplicate (Agent 2/3) or incomplete (Agent 1) — so it was auto-resolved before PMO ever saw it.
+    Distinct from pmo_new_submission_alert() (which promises "Agent 5/6 are now analyzing it" — not
+    true here, that would misstate what's actually happening) and purely informational: no PMO
+    action is needed, but the inbox should still show every submission that came in, not just the
+    ones that made it to a real Gate 2 decision, so submission volume and auto-resolution reasons
+    stay visible end to end."""
+    body = (
+        f"A project submission was received and auto-resolved before reaching PMO review.\n\n"
+        f"Project: \"{project_name}\" ({project_id})\n"
+        f"Submitted by: {submitter_name}\n\n"
+        f"Outcome: {reason}\n\n"
+        f"No action is needed — this is a visibility-only notice.\n\n"
+        f"— Automated PMO intake system"
+    )
+    return {"subject": f"Submission auto-resolved before review — {project_name}", "body": body}
+
 def acceptance(project_name: str, project_id: str, dashboard_url: str = "https://pmo.internal/dashboard", pmo_comment: str = "") -> dict:
     """`pmo_comment` mirrors rejection_feedback()'s optional PMO note (§9.3.4) — same additive
     pattern, not a replacement for anything else in the body. Lets a PMO attach a positive note or

@@ -142,9 +142,9 @@ SCENARIO_META = {
     "1_accepted_aligned_low_capex_high_price": {"title": "Aligned, low CAPEX / high price", "outcome": "Expected: Accepted"},
     "2_rejected_duplicate_exists": {"title": "Duplicate of an existing project", "outcome": "Expected: Rejected — duplicate"},
     "3_rejected_misaligned_business_direction": {"title": "Misaligned with business direction", "outcome": "Expected: Rejected — misaligned"},
-    "4_under_review_unknown_regulatory_risk": {"title": "Unknown regulatory risk", "outcome": "Expected: Under review — inconclusive"},
+    "4_under_review_unknown_regulatory_risk": {"title": "Unknown regulatory risk", "outcome": "Expected: Gate 2 PMO decision required — inconclusive verdict"},
     "5_rejected_incomplete_information": {"title": "Incomplete information at intake", "outcome": "Expected: Rejected at Agent 1 — incomplete"},
-    "6_change_request_stakeholder_flag": {"title": "Accepted, then stakeholder flags a concern", "outcome": "Expected: Accepted → Gate 3 change-management trigger"},
+    "6_change_request_stakeholder_flag": {"title": "Accepted, then stakeholder flags a concern", "outcome": "Expected: Aligned, but a stakeholder concern is flagged — Gate 2 PMO decision, with comments"},
     "7_borderline_duplicate_llm_adjudication": {"title": "Borderline similarity — LLM adjudicates", "outcome": "Expected: Not a duplicate → proceeds to Accepted"},
 }
 
@@ -221,7 +221,16 @@ def run_scenario(scenario_key):
     target = get(ref[1] if isinstance(ref, list) else ref)
     existing = [p for p in projects if p.status in ("accepted", "in_progress", "completed") and p.submission_id != target.submission_id]
     mocks = SCENARIO_MOCKS.get(scenario_key, {})
-    trace = run_submission(conn, target, existing, mocks)
+    # Case 3 (misaligned) and Case 4 (inconclusive, since the pipeline extension that lets it reach
+    # Gate 2 at all) both hit a non-aligned Agent 6 verdict -> Gate 2 reject is each one's own
+    # expected/default outcome. run_submission() defaults gate2_decision="accept" (the common case
+    # for cases 1/6/7); since Gate2OverrideRequiredError (src/orchestration/pipeline.py) now makes
+    # accepting a non-aligned verdict without a real PMO reason a hard error rather than the old
+    # silent auto-reject, this scripted one-shot runner has to pass each scenario's own expected
+    # decision explicitly, same as tests/scenarios/test_phase3.py already does for the same reason.
+    NEEDS_REJECT_DEFAULT = ("3_rejected_misaligned_business_direction", "4_under_review_unknown_regulatory_risk")
+    gate2_decision = "reject" if scenario_key in NEEDS_REJECT_DEFAULT else "accept"
+    trace = run_submission(conn, target, existing, mocks, gate2_decision=gate2_decision)
     result_id = _result_id(target, trace)
 
     if scenario_key == "6_change_request_stakeholder_flag":

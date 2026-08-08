@@ -30,7 +30,7 @@ from src.agents.agent5_business_impact_analyzer import analyze_business_impact
 from src.agents.agent6_knowledge_crosschecker import cross_check
 from src.agents.agent7_acceptance_handler import issue_project_id
 from src.agents.agent8_rejection_feedback_composer import compose_rejection
-from src.notifications.templates import submission_received, duplicate_rejection, pmo_new_submission_alert, acceptance, under_monitoring, rejection_feedback
+from src.notifications.templates import submission_received, duplicate_rejection, pmo_new_submission_alert, pmo_auto_resolved_alert, acceptance, under_monitoring, rejection_feedback
 from src.db.repositories import insert_project, update_status, write_audit_log, write_notification
 from src.orchestration.state_machine import transition, accept_project
 from src.shared.schemas import Status
@@ -82,6 +82,13 @@ def run_intake_to_gate2(conn, project, existing_projects, mocks: dict, gate1_dec
         trace["final_status"] = "rejected"
         trace["rejection_reason"] = f"Incomplete information — missing {', '.join(missing)}"
         _send(conn, project, trace, rejection_feedback(project.project_name or "your submission", "Incomplete information provided at intake"), "agent1_intake_parser")
+        # PMO visibility notice — this never reaches Agent 4/Gate 2 at all (auto-rejected here), but
+        # the PMO inbox should still show that a submission came in and why it didn't proceed, not
+        # just the requester's own rejection email.
+        _send(conn, project, trace, pmo_auto_resolved_alert(
+            project.project_name or "Untitled submission", project.project_id or project.submission_id,
+            project.submitter_name or "Unknown submitter", trace["rejection_reason"],
+        ), "agent1_intake_parser", recipient="PMO Team")
         return trace
 
     # Agent 2 — duplicate check
@@ -96,6 +103,12 @@ def run_intake_to_gate2(conn, project, existing_projects, mocks: dict, gate1_dec
         _send(conn, project, trace, notif, "agent3_duplicate_rejection_notifier")
         trace["final_status"] = "rejected"
         trace["rejection_reason"] = f"Duplicate of {dup_out['match']}"
+        # Same PMO visibility notice as the incomplete branch above — duplicates are also auto-
+        # resolved before Agent 4/Gate 2, so the PMO inbox otherwise never hears about them at all.
+        _send(conn, project, trace, pmo_auto_resolved_alert(
+            project.project_name, project.project_id or project.submission_id,
+            project.submitter_name or "Unknown submitter", trace["rejection_reason"],
+        ), "agent3_duplicate_rejection_notifier", recipient="PMO Team")
         return trace
 
     # Gate 1
@@ -152,10 +165,15 @@ def run_intake_to_gate2(conn, project, existing_projects, mocks: dict, gate1_dec
     trace["agent5"] = a5_out
     trace["agent6"] = a6_out
 
-    if a6_out["verdict"] == "inconclusive":
-        update_status(conn, project.submission_id, transition(Status.ANALYSIS.value, Status.PMO_REVIEW.value))
-        trace["final_status"] = "pmo_review (under review)"
-        return trace
+    # An "inconclusive" Agent 6 verdict (unknown/unquantified regulatory risk, no citable
+    # playbook passage either way) used to short-circuit here straight to a bare "under review"
+    # status, bypassing Gate 2 and resume_after_gate2()'s override guardrail entirely — which
+    # meant PMO had no real way to actually accept or reject this kind of project; it just sat
+    # unresolved forever and was invisible to get_gate2_queue() (status stayed off "analysis").
+    # It now falls through to the same pending_gate2 path aligned/misaligned/partially_aligned
+    # verdicts already use, so it queues for a real Gate 2 decision — an accept still requires a
+    # pmo_override_reason via the existing Gate2OverrideRequiredError guardrail below, since
+    # "inconclusive" is not in the auto-clear verdict set.
 
     trace["final_status"] = "pending_gate2"
     return trace
@@ -166,7 +184,15 @@ def default_gate2_rejection_reason(a6_out):
     resume_after_gate2() (the actual fallback if no override is given) and the Gate 2 review page
     (dashboard/render_gate2.py, which prefills its reason field with exactly this) so the two never
     drift apart."""
-    return "Not aligned with strategic focus regions or product areas" if a6_out["verdict"] == "misaligned" else "PMO rejected at Gate 2"
+    verdict = a6_out["verdict"]
+    if verdict == "misaligned":
+        return "Not aligned with strategic focus regions or product areas"
+    if verdict == "inconclusive":
+        citation = (a6_out.get("citation") or "").strip()
+        if citation:
+            return f"Agent 6 could not reach a definitive alignment verdict — {citation} — and needs PMO judgment before proceeding"
+        return "Agent 6 could not reach a definitive alignment verdict and needs PMO judgment before proceeding"
+    return "PMO rejected at Gate 2"
 
 
 def resume_after_gate2(conn, project, trace, gate2_decision, override_reason=None, pmo_comment="",
