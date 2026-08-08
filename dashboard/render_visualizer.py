@@ -272,26 +272,14 @@ def render(project_id, replay_pace_ms=5000, redirect_to=None, resume_from=None):
         dy = abs(by - ay)
 
         if dx < 20:
-            # Vertical connection (same column — U-turn or exit branch)
-<<<<<<< HEAD
-            if by > ay:
-                # going downward: start at source bottom, end at target top
-                x1, y1 = ax, ay + ah / 2
-                x2, y2 = bx, by - bh / 2
-            else:
-                # going upward (e.g. end_review above Agent 6): start at source top, end at target bottom
-                x1, y1 = ax, ay - ah / 2
-                x2, y2 = bx, by + bh / 2
-=======
-            # Detect upward edges (target above source) and flip endpoints so
-            # marker-end lands at the correct tip.
+            # Vertical connection (same column — U-turn or exit branch). Detect upward edges
+            # (target above source) and flip endpoints so marker-end lands at the correct tip.
             if by < ay:
                 x1, y1 = ax, ay - ah / 2   # source top
                 x2, y2 = bx, by + bh / 2   # target bottom
             else:
                 x1, y1 = ax, ay + ah / 2   # source bottom
                 x2, y2 = bx, by - bh / 2   # target top
->>>>>>> Test-1
             edge_svg.append(
                 f'<line id="{eid}" x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
                 f'class="edge" marker-end="url(#arrow)"/>'
